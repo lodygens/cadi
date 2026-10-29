@@ -1,0 +1,46 @@
+@startuml
+
+actor Utilisateur
+
+package Frontend {
+    [Application Web]
+}
+
+package Backend {
+    interface "API REST" as API
+    package Logic {
+        [Métier]
+    }
+    [Service Lecture] 
+    [Service Base de Données]
+    [Service Notification]
+
+    package SGBDR {
+        [Base de Données]
+    }
+}
+
+package Messagerie {
+    [Serveur email]
+}
+
+package Opendata {
+    [data.gouv.fr]
+    [enseigne1]
+    [enseigne2]
+    [enseigneN]
+}
+
+
+Utilisateur --> [Application Web]
+[Application Web] --> API : HTTPS (JSON)
+API --> [Logic]
+[Logic] --> [Service Base de Données] : Données consolidées
+[Service Lecture] <-- [Opendata] : Récupère les rappels produits publics
+[Service Lecture] --> [Logic] : Transmets les rappels produits
+[Service Base de Données] --> [Base de Données] : Stockage
+[Logic] --> [Service Notification] : Nouveaux rappels
+[Service Notification] --> [Serveur email] : Envoie les alertes
+[Serveur email] --> Utilisateur : Email d'alerte
+
+@enduml

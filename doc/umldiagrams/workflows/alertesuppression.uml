@@ -1,0 +1,14 @@
+@startuml
+start
+partition "Suppression d'une \nalerte" {
+if (Authentifié ?) then (oui)
+    if (L'utilisateur est propriétaire de l'alerte ?) then (oui)
+        :Marquage de l'alerte comme supprimée
+        (deleted = true) dans la base de données;
+    endif
+else (non)
+    stop
+endif
+}
+stop
+@enduml

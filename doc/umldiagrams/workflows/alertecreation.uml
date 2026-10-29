@@ -1,0 +1,24 @@
+@startuml
+start
+partition "Création d'une \nalerte" {
+if (Authentifié ?) then (oui)
+    :Saisie des critères
+    (marque, produit, famille,
+    enseigne, magasin, code postal);
+    if (Au moins un critère ?) then (oui)
+        if (Plusieurs critères ?) then (oui)
+            :Choix de la combinaison
+            ET (tous les critères)
+            OU (au moins un critère);
+        endif
+        if (L'alerte existe déjà ?) then (non)
+            :Création de l'alerte
+            dans la base de données;
+        endif
+    endif
+else (non)
+    stop
+endif
+}
+stop
+@enduml

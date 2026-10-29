@@ -1,0 +1,21 @@
+@startuml
+
+actor Utilisateur
+
+package Frontend {
+    [Application Web]
+}
+
+package Backend {
+    [Logique métier]
+}
+
+package SGBD {
+    [Base de données]
+}
+
+Utilisateur --> [Frontend]
+[Frontend] --> [Backend]
+[Backend] --> [SGBD]
+
+@enduml

@@ -1,0 +1,18 @@
+@startuml
+start
+partition "Suppression d'une donnée \npar l'administrateur" {
+note right
+  rappel, marque, produit, famille
+  de produit, enseigne ou magasin
+end note
+if (Authentifié en tant qu'administrateur ?) then (oui)
+    if (La donnée existe ?) then (oui)
+        :Marquage de la donnée comme supprimée
+        (deleted = true);
+    endif
+else (non)
+    stop
+endif
+}
+stop
+@enduml

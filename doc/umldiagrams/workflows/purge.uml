@@ -1,0 +1,17 @@
+@startuml
+start
+partition "Purge des \ndonnées supprimées" {
+note right
+  tâche planifiée, quotidienne
+end note
+:Recherche des données marquées comme
+supprimées depuis plus d'un an;
+:Effacement définitif de ces données
+et de leurs liens;
+:Effacement des traces d'accès
+de plus d'un an;
+:Effacement des jetons de connexion
+et des sessions expirés ou utilisés;
+}
+stop
+@enduml

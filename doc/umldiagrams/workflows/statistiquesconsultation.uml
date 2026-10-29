@@ -1,0 +1,15 @@
+@startuml
+start
+partition "Consultation \ndes statistiques" {
+if (Authentifié ?) then (oui)
+    :Choix de l'axe d'analyse
+    (enseigne, magasin, marque, produit,
+    famille, zone géographique)
+    et de la période;
+    :Affichage des statistiques;
+else (non)
+    stop
+endif
+}
+stop
+@enduml

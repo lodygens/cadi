@@ -1,0 +1,17 @@
+@startuml
+start
+partition "Mise à jour d'une \ndonnée de référence" {
+note right
+  marque, produit, famille de produit,
+  enseigne ou magasin, lue dans un rappel
+end note
+if (La donnée existe déjà ?) then (non)
+    :Création de la donnée;
+else (oui)
+    if (Les informations du rappel\nsont différentes ?) then (oui)
+        :Modification de la donnée;
+    endif
+endif
+}
+stop
+@enduml

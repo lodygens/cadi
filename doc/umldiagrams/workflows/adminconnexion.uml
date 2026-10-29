@@ -1,0 +1,16 @@
+@startuml
+start
+partition "Connexion de \nl'administrateur" {
+:Connexion par lien magique;
+:Lecture de l'email administrateur
+dans le secret local du backend;
+if (Email de l'utilisateur connecté\n= email administrateur ?) then (oui)
+    :Accès aux fonctions
+    d'administration;
+else (non)
+    :Accès aux fonctions
+    d'un utilisateur;
+endif
+}
+stop
+@enduml

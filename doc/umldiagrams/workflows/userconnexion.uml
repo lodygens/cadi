@@ -1,0 +1,32 @@
+@startuml
+start
+partition "Connexion par \nlien magique" {
+:Saisie de l'adresse email;
+if (Nombre de demandes autorisé dépassé ?) then (non)
+    :Création d'un jeton de connexion
+    (expire dans 15 minutes);
+    :Envoi d'un email avec
+    un lien et un code à 6 chiffres;
+endif
+:Message unique : « si l'adresse est valide,
+un email vous a été envoyé »;
+if (Moyen utilisé ?) then (lien)
+    :Ouverture de la page de connexion;
+    :Clic sur le bouton « Se connecter »;
+else (code)
+    :Saisie du code à 6 chiffres
+    sur la page d'origine;
+endif
+if (Jeton valide ?\n(non expiré, non utilisé,\nessais non dépassés)) then (oui)
+    :Jeton marqué comme utilisé;
+    if (Le compte existe ?) then (non)
+        :Création du compte;
+    endif
+    :Ouverture d'une session de 24 heures;
+else (non)
+    :Connexion refusée;
+    stop
+endif
+}
+stop
+@enduml

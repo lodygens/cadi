@@ -1,0 +1,43 @@
+@startuml
+hide empty description
+
+state "Pages publiques" as Public {
+    state "Accueil" as Accueil
+    state "Connexion\n(saisie de l'email)" as Connexion
+    state "Saisie du code" as Code
+    state "Page du lien magique\n(bouton « Se connecter »)" as Lien
+    state "Pages légales\n(mentions, confidentialité)" as Legal
+}
+
+state "Pages de l'utilisateur connecté" as Prive {
+    state "Mes alertes\n(tableau de bord)" as Alertes
+    state "Créer / modifier\nune alerte" as EditAlerte
+    state "Rappels" as Rappels
+    state "Détail d'un rappel" as Detail
+    state "Statistiques" as Stats
+    state "Mon compte" as Compte
+}
+
+state "Administration" as Admin
+
+[*] --> Accueil
+state "Email de connexion" as Mail <<start>>
+Mail --> Lien : lien reçu par email
+Accueil --> Connexion
+Accueil --> Legal
+Connexion --> Code : email envoyé
+Code --> Alertes : code valide
+Lien --> Alertes : clic sur « Se connecter »
+
+Alertes --> EditAlerte
+EditAlerte --> Alertes : enregistrement
+Alertes --> Detail : rappel correspondant
+Alertes --> Rappels
+Rappels --> Detail
+Detail --> EditAlerte : créer une alerte\nsur ce produit
+Alertes --> Stats
+Alertes --> Compte
+Compte --> Accueil : déconnexion\nou suppression du compte
+Alertes --> Admin : administrateur uniquement
+
+@enduml

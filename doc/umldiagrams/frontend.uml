@@ -1,0 +1,27 @@
+@startuml
+
+actor Utilisateur
+
+package "Navigateur" {
+    [Application React] as App
+}
+
+package "Hébergement OVH (France)" {
+    package "Serveur web" {
+        [Fichiers statiques\n(HTML, JS, CSS, polices)] as Static
+    }
+    package Backend {
+        interface "API REST\n/api" as API
+    }
+}
+
+Utilisateur --> App
+App --> Static : Chargement de l'application (HTTPS)
+App --> API : Requêtes HTTPS (JSON)\n+ cookie de session HttpOnly (HTTPS)
+
+note bottom of Static
+  même domaine que l'API :
+  pas de CORS, cookie SameSite=Lax
+end note
+
+@enduml

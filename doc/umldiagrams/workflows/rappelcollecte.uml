@@ -1,0 +1,30 @@
+@startuml
+start
+partition "Collecte des \nrappels produit" {
+:Lecture des sources
+(open data, pages de rappel des enseignes);
+while (Rappel suivant ?) is (oui)
+    if (Rappel déjà connu dans cette source ?\n(source, référence)) then (oui)
+        if (Le rappel a changé ?) then (oui)
+            :Mise à jour du rappel;
+        endif
+    else (non)
+        if (Rappel déjà connu dans une autre source ?) then (oui)
+            :Ajout de la source au rappel existant;
+        else (non)
+            :Création du rappel;
+            :Mise à jour des données de référence
+            (marques, produits, familles,
+            enseignes, magasins);
+            :Création des liens du rappel
+            (produits, enseignes, magasins);
+            :Ajout du rappel à la liste
+            des nouveaux rappels;
+        endif
+    endif
+endwhile (non)
+:Envoi des alertes pour
+les nouveaux rappels;
+}
+stop
+@enduml

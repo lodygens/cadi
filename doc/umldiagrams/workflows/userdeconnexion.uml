@@ -1,0 +1,12 @@
+@startuml
+start
+partition "Déconnexion d'un \nutilisateur" {
+if (Authentifié ?) then (oui)
+    :Effacement de la session;
+    :Suppression du cookie de session;
+else (non)
+    stop
+endif
+}
+stop
+@enduml

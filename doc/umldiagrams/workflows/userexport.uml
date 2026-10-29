@@ -1,0 +1,15 @@
+@startuml
+start
+partition "Export des données \nd'un utilisateur" {
+if (Authentifié ?) then (oui)
+    :Demande d'export;
+    :Génération d'un fichier
+    (compte, alertes, envois)
+    dans un format lisible par machine;
+    :Téléchargement du fichier;
+else (non)
+    stop
+endif
+}
+stop
+@enduml

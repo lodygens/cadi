@@ -1,0 +1,25 @@
+@startuml
+start
+partition "Envoi des \nalertes" {
+while (Nouveau rappel suivant ?) is (oui)
+    while (Alerte active suivante ?) is (oui)
+        if (Combinaison ET ?) then (oui)
+            :Tous les critères renseignés
+            doivent correspondre;
+        else (non)
+            :Au moins un critère renseigné
+            doit correspondre;
+        endif
+        if (Le rappel correspond à l'alerte ?) then (oui)
+            if (Email déjà envoyé pour\ncette alerte et ce rappel ?) then (non)
+                :Envoi de l'email au
+                propriétaire de l'alerte;
+                :Enregistrement de l'envoi
+                (statut envoyé ou échec);
+            endif
+        endif
+    endwhile (non)
+endwhile (non)
+}
+stop
+@enduml

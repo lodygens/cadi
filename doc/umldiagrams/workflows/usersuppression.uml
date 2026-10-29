@@ -1,0 +1,14 @@
+@startuml
+start
+partition "Suppression d'un \ncompte utilisateur" {
+if (Authentifié ?) then (oui)
+    if (L'utilisateur est propriétaire de la fiche ?) then (oui)
+        :Supprimer la fiche utilisateur;
+        :Supprimer les données associées;
+    endif
+else (non)
+    stop
+endif
+}
+stop
+@enduml

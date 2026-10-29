@@ -1,0 +1,13 @@
+@startuml
+start
+partition "Modification d'une \nfiche utilisateur" {
+if (Authentifié ?) then (oui)
+    if (L'utilisateur est propriétaire de la fiche ?) then (oui)
+        :Modifier la fiche;
+    endif
+else (non)
+    stop
+endif
+}
+stop
+@enduml

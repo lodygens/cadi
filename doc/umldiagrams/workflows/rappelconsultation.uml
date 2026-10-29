@@ -1,0 +1,16 @@
+@startuml
+start
+partition "Consultation \ndes rappels" {
+if (Authentifié ?) then (oui)
+    :Saisie de filtres facultatifs
+    (marque, produit, famille, enseigne,
+    magasin, code postal, période);
+    :Affichage des rappels
+    non supprimés correspondants;
+    :Affichage du détail d'un rappel;
+else (non)
+    stop
+endif
+}
+stop
+@enduml
