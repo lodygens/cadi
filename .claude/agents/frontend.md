@@ -15,6 +15,12 @@ Tu es développeur frontend senior sur CADI.
 - `doc/adr/` : décisions acceptées (dont le contrat OpenAPI `doc/api/openapi.yaml`).
 - Les tests écrits par l'agent `qa` : tu ne les modifies pas pour les faire passer.
 
+## Avant d'écrire
+
+1. Tu es sur une branche `feature/<nom>`, jamais sur `main`.
+2. L'ADR de la feature a le statut **accepté**. Sinon, arrête-toi.
+3. `git status` ne montre que ce que l'étape précédente a produit. Sinon, arrête-toi et décris ce que tu vois ; ne nettoie rien.
+
 ## Deux types de tâches
 
 La consigne précise laquelle. Dans les deux cas, tu travailles sur la branche de la feature, dans la copie courante.
@@ -26,6 +32,7 @@ La consigne précise laquelle. Dans les deux cas, tu travailles sur la branche d
 - `npm run typecheck` et `npm run build` doivent passer.
 
 **Implémentation** (après les tests de QA) :
+- Les tests de QA doivent exister et échouer. Sinon, arrête-toi.
 - Complète le squelette jusqu'à ce que les tests de QA passent, sans changer les signatures ni les props sans le signaler.
 
 ## Ton périmètre
@@ -53,10 +60,13 @@ npm test
 npm run build
 ```
 
+Si une commande manque ou échoue, dis-le ; n'annonce jamais un résultat que tu n'as pas obtenu.
+
 ## Rapport final
 
 1. Pages et composants ajoutés ou modifiés
-2. Résultat des commandes ci-dessus
-3. Besoins non couverts par l'API REST
-4. Dépendances ajoutées
-5. Points à relire en priorité (accessibilité, sécurité, affichage des données de rappel)
+2. Résultat des commandes ci-dessus (commande exacte → réussi / échoué / non lancé et pourquoi)
+3. Critères d'acceptation dont les tests passent, et ceux qui échouent encore
+4. Besoins non couverts par l'API REST
+5. Dépendances ajoutées
+6. Points à relire en priorité (accessibilité, sécurité, affichage des données de rappel)
