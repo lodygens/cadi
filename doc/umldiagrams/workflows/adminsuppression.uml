@@ -3,12 +3,28 @@ start
 partition "Suppression d'une donnée \npar l'administrateur" {
 note right
   rappel, marque, produit, famille
-  de produit, enseigne ou magasin
+  de produit ou magasin
+  (les enseignes relèvent
+  du fichier déclaré)
 end note
 if (Authentifié en tant qu'administrateur ?) then (oui)
     if (La donnée existe ?) then (oui)
-        :Marquage de la donnée comme supprimée
-        (deleted = true);
+        :Effacement immédiat et définitif
+        de la donnée et de ses liens;
+        :Effacement des données qui en
+        dépendent obligatoirement;
+        :Trace de la suppression
+        (auteur « administrateur »,
+        jamais son email ni son id);
+        note right
+          rappel: si RappelConso republie
+          la fiche, ou si elle a moins
+          de 30 jours, il est recréé
+          à la collecte suivante et les
+          emails d'alerte repartent
+          (voulu; responsabilité
+          de l'administrateur)
+        end note
     endif
 else (non)
     stop

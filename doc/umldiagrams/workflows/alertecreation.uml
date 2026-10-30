@@ -4,7 +4,7 @@ partition "Création d'une \nalerte" {
 if (Authentifié ?) then (oui)
     :Saisie des critères
     (marque, produit, famille,
-    enseigne, magasin, code postal);
+    enseigne, code postal);
     if (Au moins un critère ?) then (oui)
         if (Plusieurs critères ?) then (oui)
             :Choix de la combinaison
@@ -14,6 +14,8 @@ if (Authentifié ?) then (oui)
         if (L'alerte existe déjà ?) then (non)
             :Création de l'alerte
             dans la base de données;
+            :Liaison de l'alerte aux départements
+            de son code postal (un ou plusieurs);
         endif
     endif
 else (non)

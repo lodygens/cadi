@@ -1,24 +1,64 @@
 @startuml
 start
 partition "Envoi des \nalertes" {
-while (Nouveau rappel suivant ?) is (oui)
-    while (Alerte active suivante ?) is (oui)
+note right
+  à la fin de chaque collecte
+end note
+while (Rappel à traiter suivant ?) is (oui)
+    while (Alerte configurée avant\nla collecte du rappel suivante ?) is (oui)
         if (Combinaison ET ?) then (oui)
             :Tous les critères renseignés
             doivent correspondre;
+            note right
+              code postal: un des départements
+              de l'alerte dans la géographie
+              de son enseigne, si elle en a une,
+              sinon dans celle du rappel
+            end note
         else (non)
             :Au moins un critère renseigné
             doit correspondre;
+            note right
+              code postal: un des départements
+              de l'alerte dans la géographie
+              du rappel
+            end note
         endif
         if (Le rappel correspond à l'alerte ?) then (oui)
-            if (Email déjà envoyé pour\ncette alerte et ce rappel ?) then (non)
-                :Envoi de l'email au
-                propriétaire de l'alerte;
-                :Enregistrement de l'envoi
-                (statut envoyé ou échec);
+            if (Correspondance incertaine et\npolitique de risque stricte ?) then (non)
+                if (Rappel déjà signalé\npour cette alerte ?) then (non)
+                    :Ajout de la correspondance
+                    (alerte, rappel, incertaine ou non)
+                    à l'utilisateur;
+                endif
             endif
         endif
     endwhile (non)
+endwhile (non)
+while (Utilisateur suivant avec\nau moins une correspondance ?) is (oui)
+    if (Utilisateur désabonné ?) then (non)
+        :Enregistrement d'un email
+        (statut « à envoyer ») et de ses envois,
+        chaque rappel une seule fois;
+    endif
+endwhile (non)
+:Retrait des rappels à traiter
+(même transaction que les emails
+et les envois);
+}
+partition "Envoi des emails\n(service notification)" {
+while (Email « à envoyer » dont\nla tentative est due ?) is (oui)
+    :Envoi de l'email
+    (en-têtes List-Unsubscribe,
+    identifiant unique);
+    if (Résultat ?) then (succès)
+        :Statut « envoyé »;
+    elseif (échec temporaire\net tentatives restantes) then
+        :Nouvelle tentative planifiée
+        (délai croissant);
+    else (échec définitif\nou tentatives épuisées)
+        :Statut « abandonné »;
+    endif
 endwhile (non)
 }
 stop

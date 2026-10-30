@@ -25,10 +25,7 @@ package Messagerie {
 }
 
 package Opendata {
-    [data.gouv.fr]
-    [enseigne1]
-    [enseigne2]
-    [enseigneN]
+    [RappelConso\n(data.economie.gouv.fr)]
 }
 
 

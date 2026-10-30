@@ -5,7 +5,7 @@ if (Authentifié ?) then (oui)
     :Demande d'export;
     :Génération d'un fichier
     (compte, alertes, envois)
-    dans un format lisible par machine;
+    au format JSON;
     :Téléchargement du fichier;
 else (non)
     stop

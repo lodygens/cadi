@@ -7,6 +7,7 @@ state "Pages publiques" as Public {
     state "Saisie du code" as Code
     state "Page du lien magique\n(bouton « Se connecter »)" as Lien
     state "Pages légales\n(mentions, confidentialité)" as Legal
+    state "Page de désabonnement\n(bouton « Ne plus recevoir\nd'alertes par email »)" as Desab
 }
 
 state "Pages de l'utilisateur connecté" as Prive {
@@ -23,6 +24,9 @@ state "Administration" as Admin
 [*] --> Accueil
 state "Email de connexion" as Mail <<start>>
 Mail --> Lien : lien reçu par email
+state "Email d'alerte" as MailAlerte <<start>>
+MailAlerte --> Desab : lien « Ne plus recevoir\nces alertes »
+MailAlerte --> Detail : lien vers un rappel
 Accueil --> Connexion
 Accueil --> Legal
 Connexion --> Code : email envoyé

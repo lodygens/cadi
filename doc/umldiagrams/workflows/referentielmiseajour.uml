@@ -2,14 +2,21 @@
 start
 partition "Mise à jour d'une \ndonnée de référence" {
 note right
-  marque, produit, famille de produit,
-  enseigne ou magasin, lue dans un rappel
+  marque, produit (code-barres),
+  famille de produit ou magasin,
+  lue dans un rappel; les enseignes
+  relèvent du fichier déclaré
 end note
 if (La donnée existe déjà ?) then (non)
     :Création de la donnée;
 else (oui)
-    if (Les informations du rappel\nsont différentes ?) then (oui)
-        :Modification de la donnée;
+    if (Famille de produit et informations\ndu rappel différentes ?) then (oui)
+        :Modification de la famille;
+    else (non)
+        :Aucune modification
+        (marques: fusion seulement,
+        produits et magasins:
+        jamais modifiés);
     endif
 endif
 }

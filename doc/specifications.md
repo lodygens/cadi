@@ -27,18 +27,36 @@ CADI (Consommation Alerte Danger Informations)
     - [Gouvernance des enseignes](#gouvernance-des-enseignes)
     - [Gouvernance des magasins](#gouvernance-des-magasins)
     - [Gouvernance des rappels](#gouvernance-des-rappels)
+    - [Gouvernance du référentiel géographique](#gouvernance-du-référentiel-géographique)
     - [Gouvernance des statistiques](#gouvernance-des-statistiques)
 - [Structures des données](#structures-des-données)
   - [Utilisateurs](#utilisateurs)
   - [Marques](#marques)
+    - [Fusion de marques](#fusion-de-marques)
   - [Produits](#produits)
   - [Familles de produits](#familles-de-produits)
   - [Enseignes](#enseignes)
+    - [Écritures d'enseigne](#écritures-denseigne)
   - [Magasins](#magasins)
   - [Alertes](#alertes)
+    - [Alertes départements](#alertes-départements)
   - [Rappels](#rappels)
+    - [Interprétation des textes libres](#interprétation-des-textes-libres)
+    - [Interprétation des distributeurs](#interprétation-des-distributeurs)
   - [Sources des rappels](#sources-des-rappels)
+  - [Collectes](#collectes)
+    - [Rappels à traiter](#rappels-à-traiter)
   - [Liens entre les rappels et les autres données](#liens-entre-les-rappels-et-les-autres-données)
+    - [Rappels produits](#rappels-produits)
+    - [Rappels enseignes](#rappels-enseignes)
+    - [Rappels magasin](#rappels-magasin)
+    - [Rappels départements](#rappels-départements)
+    - [Géographie par enseigne](#géographie-par-enseigne)
+  - [Référentiel géographique](#référentiel-géographique)
+    - [Départements](#départements)
+    - [Appellations de zone](#appellations-de-zone)
+    - [Zones départements](#zones-départements)
+  - [Emails d'alerte](#emails-dalerte)
   - [Envois](#envois)
   - [Jetons de connexion](#jetons-de-connexion)
   - [Sessions](#sessions)
@@ -56,6 +74,8 @@ CADI (Consommation Alerte Danger Informations)
     - [Modification d'une alerte](#modification-dune-alerte)
     - [Suppression d'une alerte](#suppression-dune-alerte)
     - [Envoi des alertes](#envoi-des-alertes)
+    - [Correspondances incertaines](#correspondances-incertaines)
+    - [Désabonnement des emails d'alerte](#désabonnement-des-emails-dalerte)
   - [Workflows des rappels](#workflows-des-rappels)
     - [Collecte des rappels](#collecte-des-rappels)
     - [Consultation des rappels](#consultation-des-rappels)
@@ -66,8 +86,7 @@ CADI (Consommation Alerte Danger Informations)
     - [Consultation des statistiques](#consultation-des-statistiques)
   - [Workflows d'administration](#workflows-dadministration)
     - [Connexion d'un administrateur](#connexion-dun-administrateur)
-    - [Purge des données supprimées](#purge-des-données-supprimées)
-    - [Droit à l'oubli](#droit-à-loubli)
+    - [Purge des données expirées](#purge-des-données-expirées)
 - [Backend](#backend)
   - [Architecture](#architecture-1)
   - [Interfaces](#interfaces)
@@ -87,7 +106,7 @@ CADI (Consommation Alerte Danger Informations)
 
 # Introduction
 
-CADI est une application permettant de recevoir des alertes concernant les rappels produit en France afin que les consommateurs puissent facilement suivrent les rappels produits de différentes enseignes et du minitère de l'économie et des finances. 
+CADI est une application permettant de recevoir des alertes concernant les rappels produit en France afin que les consommateurs puissent facilement suivre les rappels produit publiés par le ministère de l'économie et des finances (RappelConso). 
 
 Les utilisateurs de cette application sont des consommateurs.
 
@@ -95,7 +114,7 @@ Les utilisateurs de cette application sont des consommateurs.
 
 Cette application a deux objectifs: (1) faciliter l'accès aux informations relatives aux rappels produit et (2) suivre les rappels produit pour pouvoir en faire des analyses et des suivis dans le temps, par produit, par type de produit, par marque de produit, par enseigne et par géographie.
 
-Les utilisateurs sont invités à selectionner des produits, des familles de produits et des marques de produit à suivre. Ils peuvent aussi selectionner des zones géographiques et mêmes des magasins.
+Les utilisateurs sont invités à selectionner des produits, des familles de produits et des marques de produit à suivre. Ils peuvent aussi selectionner des enseignes et des zones géographiques.
 
 ## Périmètre fonctionnel
 
@@ -105,7 +124,7 @@ D'autre part, l'application calcule des statistiques mises à la disposition des
 
 ## Périmètre technique
 
-L'application sera accessible et utilisable sur une page Web. Elle sera développée en React et Node.js, pour le *frontend* et en Golang pour le *backend*. Le backend sera architecturé avec des composants faiblement couplés, pour une meilleure gestion des déploiements et de la scalabilité. L'application devra être scalable pour supporter jusqu’à 100 000 utilisateurs simultanés. Une application mobile native est prévue.
+L'application sera accessible et utilisable sur une page Web. Elle sera développée en React et Node.js, pour le *frontend* et en Golang pour le *backend*. Le backend sera architecturé avec des composants faiblement couplés, pour une meilleure gestion des déploiements et de la scalabilité. Pour la première version, l'application est dimensionnée pour 100 000 utilisateurs inscrits et 1 000 utilisateurs simultanés, avec des pics de consultation après un rappel médiatisé, absorbés par le cache des données communes dans le backend. Elle est déployée en conteneurs Docker avec docker compose, sur un seul serveur chez OVH en France (voir [Architecture du backend](#architecture-1)). Au-delà, elle monte en charge en ajoutant des conteneurs d'API sur ce serveur ou en prenant un serveur plus puissant; les composants faiblement couplés permettront de la répartir sur plusieurs serveurs sans changer leur code, mais avec un autre outil de déploiement que docker compose. Une application mobile native est prévue.
 
 
 # Architecture
@@ -138,7 +157,7 @@ Tout utilisateur a les droits suivants:
 
 - droit d’accès pour consulter leurs données personnelles.;
 - doit de rectification;
-- droit à l’effacement ("droit à l’oubli") : tout utilisateur peut demander l'effacement définitif de ses données; la demande est traitée par un administrateur selon une procédure dédiée (voir [Durée de conservation des données](#durée-de-conservation-des-données));
+- droit à l’effacement : tout utilisateur peut effacer son compte à tout moment, depuis la page *Mon compte*; l'effacement de son compte et de toutes ses données est immédiat et définitif (voir [Suppression d'un utilisateur](#suppression-dun-utilisateur));
 - droit à la portabilité : tout utilisateur peut demander l'export de ses données.
 
 ## Droits des enseignes et des marques
@@ -166,13 +185,13 @@ Les informations collectées sur les marques et les enseignes sont fournies en o
 
 ## Durée de Conservation des Données
 
-1. Les données utilisateur sont conservées un an:
+1. Les données d'un utilisateur sont conservées tant que son compte existe:
 
-- une donnée supprimée par un utilisateur est marquée comme effacée (voir [Suppression de données](#suppression-de-données)), puis effacée définitivement de la base de données un an après sa suppression;
-- les traces des accès sont conservées un an;
-- les jetons de connexion et les sessions sont effacés dès qu'ils ont expiré ou ont été utilisés.
-
-**Droit à l'oubli** : si un utilisateur demande l'effacement de ses données sans attendre ce délai, un administrateur applique une procédure dédiée qui efface définitivement de la base de données le compte de l'utilisateur et toutes ses alertes. La procédure est décrite dans le workflow [Droit à l'oubli](#droit-à-loubli).
+- toute suppression est immédiate et définitive: il n'y a pas de suppression logique (voir [Suppression de données](#suppression-de-données));
+- la suppression du compte efface immédiatement le compte, les alertes, les emails d'alerte et leurs envois, les sessions et les jetons de connexion de l'utilisateur;
+- les traces des accès sont conservées un an; elles ne contiennent pas l'adresse email;
+- les jetons de connexion et les sessions sont effacés dès qu'ils ont expiré ou ont été utilisés;
+- les sauvegardes de la base de données sont conservées 30 jours: les données d'un compte supprimé disparaissent de la base immédiatement, et des sauvegardes au plus 30 jours après (voir [Sauvegardes](#architecture-1)). La politique de confidentialité l'indique.
 
 2. Les rappels sont gardés indéfiniment.
 
@@ -213,14 +232,21 @@ L’application permet de gérer des alertes de rappels produit et les statistiq
 3. Gestion des marques: les utilisateurs peuvent configurer et recevoir les alertes par marque;
 4. Gestion des produits: les utilisateurs peuvent configurer et recevoir les alertes par produit;
 5. Gestion des familles de produits: les utilisateurs peuvent configurer et recevoir les alertes par famille de produit;
-5. Gestion des enseignes et des magasins: les utilisateurs peuvent configurer et recevoir les alertes par enseigne ou par magasin;
-6. Gestion des lieux géographiques: les utilisateurs peuvent peuvent configurer et recevoir les alertes par lieu géographique;
-6. Statistiques: les utilisateurs peuvent lire les statistiques produites par l'application. Les statistiques sont calculées au fur et à mesure des rappels produits.
+6. Gestion des enseignes et des magasins: les utilisateurs peuvent configurer et recevoir les alertes par enseigne; dans cette première version, le magasin n'est pas un critère d'alerte: les magasins sont liés aux rappels pour l'affichage, les statistiques et la géographie par enseigne;
+7. Gestion des lieux géographiques: les utilisateurs peuvent peuvent configurer et recevoir les alertes par lieu géographique;
+8. Statistiques: les utilisateurs peuvent lire les statistiques produites par l'application. Les statistiques sont calculées au fur et à mesure des rappels produits.
 
 
 ## Gouvernance
 
 Les informations stockées par l’application sont gérées selon des règles de gouvernance décrites dans ce chapitre. Ces règles définissent la création, l'accès, la propriété et la suppression des données fournies à l'application.
+
+Les données se répartissent en deux catégories:
+
+- les données communes (rappels, marques, produits, familles de produits, enseignes, magasins, référentiel géographique, statistiques) sont les mêmes pour tous et accessibles à tout utilisateur connecté; elles ne sont jamais accessibles sans connexion;
+- les données personnelles (compte, alertes, emails d'alerte et envois, sessions, jetons de connexion) ne sont accessibles qu'à leur propriétaire.
+
+Sans connexion, seules les pages publiques sont accessibles (accueil, connexion, pages légales).
 
 ### Gouvernance des utilisateurs
 
@@ -229,7 +255,7 @@ Les informations stockées par l’application sont gérées selon des règles d
 3. **Transfert de propriété**: il est impossible de transférer la propriété d'une fiche utilisateur;
 4. **Lecture**: les fiches utilisateurs sont privées;
 5. **Modification** : tout utilisateur peut modifier sa propre fiche;
-6. **Suppression**: tout utilisateur peut supprimer sa fiche. Les alertes de l'utilisateur sont alors elles aussi supprimées.
+6. **Suppression**: tout utilisateur peut supprimer son compte. Le compte et toutes les données de l'utilisateur sont alors effacés, immédiatement et définitivement.
 
 ### Gouvernance des alertes
 
@@ -238,29 +264,29 @@ Les informations stockées par l’application sont gérées selon des règles d
 4. **Lecture**: une alerte est accessible par son propriétaires;
 5. **Modification** : une alerte peut être modifiée par son propriétaire;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'une alerte;
-6. **Suppression**: une alerte alerte peut être supprimée par son propriétaire.
+6. **Suppression**: une alerte peut être supprimée par son propriétaire; elle est effacée immédiatement et définitivement.
 
 ### Gouvernance des marques
 
 Les marques sont gérées par le backend, en fonction des rappels de produit détectés.
 
-1. **Création** : le backend créé une marque qui apparait pour la première fois dans un rappel produit;
+1. **Création** : le backend crée une marque lorsqu'un rappel cite un nom que la fusion de marques ne rattache à aucune marque connue (voir [Fusion de marques](#fusion-de-marques));
 2. **Propriété**: les marques appartiennent au backend;
 4. **Lecture**: les marques sont librement accessibles aux utilisateurs enregistrés;
-5. **Modification** : le backend peut modifier une marque selon les informations contenues dans un rappel produit; cet évènement devrait être rare;
+5. **Modification** : la seule modification possible est la fusion d'une marque avec une marque déjà connue, décidée par l'IA de la fusion de marques ou par le Product Owner dans le fichier des décisions de fusion. Une fusion décidée par le Product Owner renseigne le lien `id_marque_cible` de la marque absorbée et ne modifie aucun rappel. Le nom d'une marque n'est jamais modifié;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'une marque;
-6. **Suppression**: seul l'admlinitrateur peut supprimer une marque.
+6. **Suppression**: seul l'administrateur peut supprimer une marque; l'effacement est immédiat et définitif (voir [Suppression de données](#suppression-de-données)).
 
 ### Gouvernance des produits
 
 Les produits sont gérés par le backend, en fonction des rappels de produit détectés.
 
-1. **Création** : le backend créé un produit qui apparait pour la première fois dans un rappel produit;
+1. **Création** : le backend crée un produit lorsqu'un rappel cite pour la première fois son code-barres (GTIN); une fiche sans code-barres ne crée aucun produit (voir [Produits](#produits));
 2. **Propriété**: les produits appartiennent au backend;
 4. **Lecture**: les produits sont librement accessibles aux utilisateurs enregistrés;
-5. **Modification** : le backend peut modifier un produit selon les informations contenues dans un rappel produit; cet évènement devrait être rare;
+5. **Modification** : un produit n'est jamais modifié après sa création;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'un produit;
-6. **Suppression**: seul l'admlinitrateur peut supprimer un produit.
+6. **Suppression**: seul l'administrateur peut supprimer un produit; l'effacement est immédiat et définitif (voir [Suppression de données](#suppression-de-données)).
 
 ### Gouvernance des familles de produit
 
@@ -271,40 +297,47 @@ Les familles de produits sont gérées par le backend, en fonction des rappels d
 4. **Lecture**: les familles de produits sont librement accessibles aux utilisateurs enregistrés;
 5. **Modification** : le backend peut modifier une famille de produits selon les informations contenues dans un rappel produit; cet évènement devrait être rare;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'une famille de produits;
-6. **Suppression**: seul l'admlinitrateur peut supprimer une famille de produits.
+6. **Suppression**: seul l'administrateur peut supprimer une famille de produits; l'effacement est immédiat et définitif (voir [Suppression de données](#suppression-de-données)).
 
 ### Gouvernance des enseignes
 
-Les enseignes sont gérées par le backend, en fonction des rappels de produit détectés.
+Les enseignes forment une liste déclarée, avec leurs écritures (voir [Enseignes](#enseignes)).
 
-1. **Création** : le backend créé une enseigne qui apparait pour la première fois dans un rappel produit;
+1. **Création** : une enseigne et ses écritures sont ajoutées dans le fichier déclaré des enseignes, versionné avec le code et relu comme lui; la collecte ne crée jamais d'enseigne;
 2. **Propriété**: les enseignes appartiennent au backend;
-4. **Lecture**: les enseignes sont librement accessibles aux utilisateurs enregistrés;
-5. **Modification** : le backend peut modifier une enseigne selon les informations contenues dans un rappel produit; cet évènement devrait être rare;
+4. **Lecture**: les enseignes sont accessibles à tout utilisateur connecté;
+5. **Modification** : uniquement par le fichier déclaré (ex: ajout d'une écriture signalée par la collecte);
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'une enseigne;
-6. **Suppression**: seul l'admlinitrateur peut supprimer une enseigne.
+6. **Suppression**: uniquement par le fichier déclaré; l'administrateur ne peut pas supprimer une enseigne depuis l'application.
 
 ### Gouvernance des magasins
 
 Les magasins sont gérés par le backend, en fonction des rappels de produit détectés.
 
-1. **Création** : le backend créé un magasin qui apparait pour la première fois dans un rappel produit;
+1. **Création** : le backend crée un magasin lorsqu'un rappel le cite sans ambiguïté (voir [Interprétation des distributeurs](#interprétation-des-distributeurs));
 2. **Propriété**: les magasins appartiennent au backend;
 4. **Lecture**: les magasins sont librement accessibles aux utilisateurs enregistrés;
-5. **Modification** : le backend peut modifier un magasin selon les informations contenues dans un rappel produit; cet évènement devrait être rare;
+5. **Modification** : un magasin n'est jamais modifié après sa création;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'un magasin;
-6. **Suppression**: seul l'admlinitrateur peut supprimer un magasin.
+6. **Suppression**: seul l'administrateur peut supprimer un magasin; l'effacement est immédiat et définitif (voir [Suppression de données](#suppression-de-données)).
 
 ### Gouvernance des rappels
 
-Les rappels sont gérés par le backend, à partir des sources de rappels produit (open data et pages de rappel des enseignes).
+Les rappels sont gérés par le backend. Seules les fiches nationales de l'open data RappelConso créent des rappels. Les pages de rappels des enseignes sont exclues de la V1 (voir [Sources des rappels](#sources-des-rappels)).
 
-1. **Création** : le backend créé un rappel qui apparait pour la première fois dans une source; un rappel déjà connu, trouvé dans une autre source, n'est pas créé une seconde fois;
+1. **Création** : le backend crée un rappel lorsqu'une fiche RappelConso nationale publiée à partir de la date de lancement du service apparaît pour la première fois, c'est-à-dire lorsque son numéro de fiche (`numero_fiche`) est encore inconnu. Une republication d'une fiche déjà connue n'est pas un nouveau rappel. Les fiches RAPEX sont ignorées (voir [Sources des rappels](#sources-des-rappels));
 2. **Propriété**: les rappels appartiennent au backend;
 3. **Lecture**: les rappels sont librement accessibles aux utilisateurs enregistrés;
-4. **Modification** : le backend peut modifier un rappel lorsque sa source le met à jour (ex: fin de la procédure de rappel);
+4. **Modification** : un rappel n'est **jamais modifié** après sa création (*write once*), même lorsque sa fiche RappelConso est republiée. 
 5. **Transfert de propriété**: il est impossible de transférer la propriété d'un rappel;
-6. **Suppression**: seul l'administrateur peut supprimer un rappel.
+6. **Suppression**: seul l'administrateur peut supprimer un rappel. Si RappelConso republie ensuite la fiche, ou si elle a moins de 30 jours (marge de recouvrement), le rappel est recréé à la collecte suivante et les emails d'alerte repartent: c'est voulu, et l'administrateur en porte la responsabilité (voir [Suppression de données](#suppression-de-données)).
+
+### Gouvernance du référentiel géographique
+
+1. **Création et modification** : le backend charge les départements et les régions actuelles depuis le Code officiel géographique de l'INSEE (voir [Outils externes](#outils-externes)), et les met à jour à chaque nouvelle édition (annuelle). Les autres appellations de zone (anciennes régions, groupements, variantes d'écriture) sont maintenues dans un fichier versionné avec le code, chargé avec le référentiel;
+2. **Propriété**: le référentiel géographique appartient au backend;
+3. **Lecture**: le référentiel est accessible à tout utilisateur connecté;
+4. **Suppression**: sans objet; aucun utilisateur, même l'administrateur, ne peut le modifier ni le supprimer depuis l'application.
 
 ### Gouvernance des statistiques
 
@@ -321,10 +354,11 @@ La classe utilisateurs contient les informations relatives aux utilisateurs:
 
 ```
 - int id_user     : requis ; automatique
-- boolean deleted : requis ; default 'false'
 - string email    : requis ; unique ; identifiant de l'utilisateur et adresse d'envoi des alertes
 - string prenom   : facultatif
 - string nom      : facultatif
+- datetime desabonne_at : facultatif ; date du désabonnement des emails d'alerte ; vide si l'utilisateur reçoit les alertes
+- string politique_risque : requis ; 'prudente' ou 'stricte' ; default 'prudente' ; voir [Correspondances incertaines](#correspondances-incertaines)
 ```
 
 L'adresse email est vérifiée par construction: un compte n'est créé que lorsque l'utilisateur s'est connecté avec le lien ou le code reçu à cette adresse.
@@ -333,28 +367,75 @@ La table ne contient volontairement aucune colonne de rôle: l'administrateur es
 
 ## Marques
 
-La classe marques contient les informations relatives aux marques: raison_sociale, numéro SIRET etc. Ces informations sont celles contenues dans un rappel produit, le cas échéant.
+La classe marques contient les marques des produits rappelés, telles que les sources les écrivent. Une même marque peut être écrite de plusieurs façons (ex: « Bonne Maman® », « BONNE MAMAN », « Bonne Mamain »). Les écritures que la [fusion de marques](#fusion-de-marques) reconnaît comme une même marque ne forment qu'une seule marque.
 
 ```
-- int id_marque          : requis ; automatique
-- boolean deleted        : requis ; default 'false'
-- string raison_sociale  : requis
+- int id_marque           : requis ; automatique
+- string nom              : requis ; nom tel qu'écrit par la première source qui l'a cité (ex: 'Bonne Maman®')
+- string nom_normalise    : requis ; nom normalisé (ex: 'bonne maman')
+- string cle_comparaison  : requis ; unique ; nom normalisé sans espaces (ex: 'bonnemaman'), voir ci-dessous
+- string raison_sociale   : facultatif ; société titulaire de la marque, si la source l'indique
+- int id_marque_cible     : facultatif ; marque qui a absorbé celle-ci lors d'une fusion décidée par le Product Owner ; vide si la marque n'a pas été absorbée
 ```
+
+La **marque retenue** d'une marque est sa marque cible si elle en a une, sinon elle-même. Une marque cible n'a jamais elle-même de cible: si une marque cible est à son tour absorbée, les marques qui pointaient vers elle pointent vers la nouvelle cible.
+
+### Fusion de marques
+
+La **fusion de marques** est la chaîne qui reconnaît, à la collecte, qu'un nom de marque cité par un rappel désigne une marque déjà connue. Le nom cité est alors rattaché à cette marque; sinon, une nouvelle marque est créée. Les étapes sont appliquées dans l'ordre:
+
+1. **Normalisation.** Le nom est normalisé (voir [Interprétation des textes libres](#interprétation-des-textes-libres)), puis ses espaces sont retirés pour former la **clé de comparaison**. Ainsi « Bonne Maman® », « BONNE MAMAN », « Bonne-Maman » et « bonnemaman » donnent tous « bonnemaman »; « 5 five » et « 5five » donnent « 5five »; « best jardin » et « bestjardin » donnent « bestjardin ». Deux noms de même clé désignent toujours la même marque.
+2. **Noms proches.** Si la clé est inconnue, le nom est comparé aux noms proches déjà connus (ex: au plus 2 caractères de différence, ou un nom contenu dans l'autre). S'il n'a aucun nom proche, une nouvelle marque est créée.
+3. **IA.** Une IA tranche les cas restants: pour chaque nom proche, elle indique par un score si les deux noms désignent la même marque. Au-dessus du seuil, les deux marques sont fusionnées: le nom cité est rattaché à la marque déjà connue. Le seuil initial est de 80 %; il est calibré sur un échantillon d'environ 200 paires de noms vérifiées à la main.
+4. **Décisions enregistrées.** Chaque décision de l'IA est enregistrée (table ci-dessous) et n'est jamais recalculée: une paire de noms déjà jugée n'est plus soumise à l'IA.
+5. **Décision du Product Owner.** Sous le seuil, le nom cité devient une nouvelle marque, et la paire est signalée au Product Owner. Il tranche dans un fichier de décisions de fusion, versionné avec le code et relu comme lui. Une fusion qu'il décide ne modifie aucun rappel: la nouvelle marque est conservée et reçoit un lien vers la marque déjà connue (`id_marque_cible`).
+
+Le critère *marque* d'une alerte, les filtres et les statistiques portent sur la **marque retenue**: ils suivent le lien `id_marque_cible`. Une alerte qui cite une marque absorbée reçoit donc aussi les rappels de la marque qui l'a absorbée, et inversement.
+
+Décisions de fusion de l'IA:
+
+```
+- int id_decision        : requis ; automatique
+- string cle_nom         : requis ; clé de comparaison du nom cité (ex: 'bonnemamain')
+- int id_marque          : requis ; ref sur la marque déjà connue à laquelle le nom a été comparé
+- int score              : requis ; score donné par l'IA, de 0 à 100
+- boolean fusion         : requis ; vrai si le score atteint le seuil
+- string justification   : requis ; justification donnée par l'IA
+- string version_modele  : requis ; modèle d'IA et sa version
+- datetime date_decision : requis
+  unicité : (cle_nom, id_marque)
+```
+
+Les données envoyées à l'IA sont des données publiques, issues des rappels (noms de marque): elles ne contiennent **aucune donnée personnelle**.
+
+*NB: restent à trancher par le Product Owner: le choix du modèle d'IA et de son hébergement (souveraineté); le comportement à la suppression d'une marque fusionnée; l'envoi ou non des alertes passées après une fusion décidée après coup.*
 
 ## Produits
 
-La classe produits contient les informations relatives aux produits: nom, code barre etc. Ces informations sont celles contenues dans un rappel produit, le cas échéant. La marque est facultative, car elle n'est pas toujours mentionnée dans les rappels.
+La classe produits contient les produits rappelés, identifiés par leur code-barres (GTIN). **Un produit est un code-barres.**
 
 ```
 - int id_produit  : requis ; automatique
-- boolean deleted : requis ; default 'false'
-- int id_marque   : facultatif ; identifiant de la marque 
-- int id_famille  : requis ; identifiant de la famille de produit
-- string nom      : requis
-- string gtin     : facultatif ; code-barres du produit ; unique s'il est renseigné
+- string gtin     : requis ; unique ; code-barres du produit
+- int id_famille  : requis ; identifiant de la famille de produit, celle de la fiche qui l'a cité en premier
+- string nom      : requis ; description du produit dans la fiche qui l'a cité en premier (champ « modèles ou références »)
 ```
 
-Certains produits rappelés, notamment hors alimentaire, n'ont pas de GTIN.
+Une fiche RappelConso donne une seule marque, une seule description de produit et de zéro à plusieurs codes-barres. Le modèle suit donc la fiche:
+
+- la **marque** est portée par le rappel (champ `id_marque` des [rappels](#rappels)), pas par le produit;
+- une fiche crée un produit par code-barres; une fiche à plusieurs codes-barres crée plusieurs produits, qui ont le même nom;
+- une fiche **sans code-barres** ne crée aucun produit: le rappel garde sa marque, sa famille et sa description, et peut être reçu par les critères marque, famille, enseigne et code postal, mais pas par le critère produit. Cela concerne environ 4 fiches sur 10 (39 % des fiches nationales publiées de juillet 2024 à octobre 2026 n'ont aucun code-barres valide).
+
+**Code-barres valide.** Le champ d'identification des produits de RappelConso mélange codes-barres, numéros de lot, types de date (« date limite de consommation ») et dates: dans les fiches nationales de juillet 2024 à octobre 2026, seule une valeur sur dix est un code-barres. Une valeur ne crée un produit que si:
+
+- elle ne contient que des chiffres, au nombre de 8, 12, 13 ou 14;
+- sa clé de contrôle GS1 est correcte;
+- ce n'est pas un code interne à un magasin (code de 13 chiffres commençant par « 2 », ou de 14 chiffres dont le deuxième chiffre est « 2 », ex: produits vendus au poids): un tel code ne désigne pas le même produit d'une enseigne à l'autre.
+
+Les autres valeurs ne créent rien: elles sont conservées, telles que publiées, dans le champ `lots` du rappel.
+
+Exemple: une fiche « Bonne Maman », « confiture fraise 370 g et 750 g », avec deux codes-barres, crée un rappel de marque Bonne Maman et deux produits nommés « confiture fraise 370 g et 750 g ».
 
 ## Familles de produits
 
@@ -362,7 +443,6 @@ La classe familles de produits contient les informations relatives aux familles 
 
 ```
 - int id_famille        : requis ; automatique
-- boolean deleted       : requis ; default 'false'
 - string nom            : requis
 - int id_famille_parent : facultatif ; famille parente
 ```
@@ -371,89 +451,180 @@ Les familles de produits sont organisées en deux niveaux, comme dans RappelCons
 
 ## Enseignes
 
-La classe enseignes contient les informations relatives aux enseignes (ex: Carrefour, E.Leclerc, Auchan). C'est au niveau de l'enseigne que l'application recherche les informations sur les rappels produit: open data et pages de rappel publiées par chaque enseigne.
+La classe enseignes contient les informations relatives aux enseignes (ex: Carrefour, E.Leclerc, Auchan).
 
 ```
 - int id_enseigne    : requis ; automatique
-- boolean deleted    : requis ; default 'false'
-- string nom         : requis
-- string url_rappels : facultatif ; page des rappels produit de l'enseigne (ex: https://www.carrefour.fr/rappel-produits)
+- string nom         : requis ; nom de référence (ex: 'E.Leclerc')
+```
+
+Les enseignes forment une **liste déclarée**: elles sont décrites dans un fichier versionné avec le code, avec toutes leurs écritures, et ne sont jamais créées par la collecte (voir [Gouvernance des enseignes](#gouvernance-des-enseignes)). Sinon, les producteurs et commerces cités dans les rappels (« fromagerie pauly », « saisonniers ») deviendraient des enseignes.
+
+### Écritures d'enseigne
+
+Les écritures d'enseigne sont une table de correspondance du fichier déclaré des enseignes: chaque écriture, normalisée, désigne une enseigne (ex: « cooperative u », « super u », « u express » → U). Elle est chargée avec le fichier déclaré; ce n'est pas une donnée gérée dans l'application. Les formats de magasin sont des écritures de leur enseigne: une alerte « Carrefour » couvre aussi Carrefour Market et Carrefour City.
+
+```
+- string nom_normalise : requis ; unique ; ex: 'e leclerc', 'centre e leclerc', 'leclerc', 'cooperative u', 'super u', 'u express', 'carrefour market', 'carrefour hypermarche'
+- int id_enseigne      : requis ; ref enseigne
 ```
 
 ## Magasins
 
-La classe magasins contient les informations relatives aux magasins. Un magasin appartient à une enseigne; une enseigne a de zéro à plusieurs magasins. Un rappel produit peut ne concerner que certains magasins d'une enseigne. Les magasins sont créés au fur et à mesure qu'ils apparaissent dans un rappel produit.
+La classe magasins contient les informations relatives aux magasins. Un magasin appartient à une enseigne; une enseigne a de zéro à plusieurs magasins. Un rappel produit peut ne concerner que certains magasins d'une enseigne. Les magasins sont créés par la collecte, lorsqu'un rappel cite un magasin reconnu sans ambiguïté (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)).
 
 ```
-- int id_magasin     : requis ; automatique
-- boolean deleted    : requis ; default 'false'
-- int id_enseigne    : requis ; enseigne du magasin
-- string nom         : requis
-- string adresse     : facultatif
-- string code_postal : requis
-- string ville       : requis
+- int id_magasin          : requis ; automatique
+- int id_enseigne         : requis ; enseigne du magasin
+- string nom              : requis ; nom tel qu'écrit par la source (ex: 'Carrefour hypermarché Ermont')
+- string nom_normalise    : requis ; ex: 'carrefour hypermarche ermont'
+- string adresse          : facultatif
+- string code_postal      : requis
+- string ville            : requis
+- string code_departement : requis ; ref département
+  unicité : (id_enseigne, nom_normalise)
 ```
 
 ## Alertes
 
-Tout utilisateur peut créer des alertes; il y a une relation est de type 1 à N: un utilisateur peut avoir de zéro à plusieurs alertes. Une alerte a les données suivantes: date, produit, marque, enseigne, magasin
+Tout utilisateur peut créer des alertes; il y a une relation est de type 1 à N: un utilisateur peut avoir de zéro à plusieurs alertes. Une alerte a les données suivantes: date, produit, marque, enseigne
 
 ```
 - int id_alerte      : requis ; automatique
-- boolean deleted    : requis ; default 'false'
 - int id_user        : requis ; utilisateur propriétaire de l'alerte
 - int id_enseigne    : facultatif ; ref sur l'enseigne
-- int id_magasin     : facultatif ; ref sur le magasin
 - int id_marque      : facultatif ; ref sur la marque
 - int id_famille     : facultatif ; ref sur la famille de produit
 - int id_produit     : facultatif ; ref sur le produit
-- string code_postal : facultatif ; code postal pour filtre géographique
+- string code_postal : facultatif ; code postal pour filtre géographique ; ses départements sont dans la table alertes départements
 - string combinaison : requis ; 'ET' ou 'OU' ; default 'OU'
+- datetime date_configuration : requis ; date de création ou de dernière modification de l'alerte ; seuls les rappels collectés après cette date lui sont signalés (voir [Envoi des alertes](#envoi-des-alertes))
 ```
+
+Dans cette première version, le magasin n'est pas un critère d'alerte.
 
 Une alerte comporte au moins un critère. Le champ `combinaison` indique comment les critères renseignés sont combinés:
 
 - `ET` : un rappel déclenche l'alerte si **tous** les critères renseignés correspondent (ex: marque X **et** enseigne Carrefour);
 - `OU` : un rappel déclenche l'alerte si **au moins un** des critères renseignés correspond.
 
+Les critères marque, produit, famille de produit et enseigne ne peuvent désigner que des données déjà connues de l'application, c'est-à-dire apparues dans au moins un rappel (voir [Gestion des risques](#gestion-des-risques)).
+
+### Alertes départements
+
+Cette table fait le lien entre une alerte et les départements de son code postal.
+
+```
+- int id_alerte           : requis ; ref alerte
+- string code_departement : requis ; ref département
+  unicité : (id_alerte, code_departement)
+```
+
+Les départements sont déduits du code postal à l'enregistrement de l'alerte, grâce à la base officielle des codes postaux (voir [Outils externes](#outils-externes)): le préfixe du code postal ne suffit pas (ex: Corse, outre-mer, communes dont le code postal relève d'un département voisin). Un code postal qui couvre plusieurs départements les couvre tous: l'alerte est liée à chacun d'eux. Cela concerne 16 codes postaux sur 6 328 dans la base officielle des codes postaux: 01200, 01410, 01590, 05110, 05130, 05160, 05700, 06260, 13780, 21340, 33220, 37160, 42620, 43450, 48250, 52100.
+
 ## Rappels
 
-La classe rappels contient les informations relatives aux rappels produit. Un rappel est publié à une date, pour un motif, et concerne un  produit ou une famille de produits (e.g "Viandes et préparations de viande ficelées"). Ses champs reprennent ceux de RappelConso, la principale source de rappels.
+La classe rappels contient les informations relatives aux rappels produit. Un rappel est publié à une date, pour un motif, et concerne un  produit ou une famille de produits (e.g "Viandes et préparations de viande ficelées"). Ses champs reprennent ceux de RappelConso, la seule source qui crée des rappels (voir [Sources des rappels](#sources-des-rappels)).
 
 ```
 - int id_rappel             : requis ; automatique
-- boolean deleted           : requis ; default 'false'
-- date date_publication     : requis
-- date date_fin_procedure   : facultatif ; fin de la procédure de rappel ou de l'affichage
+- string numero_fiche       : requis ; unique ; numéro de la fiche RappelConso (jamais son id, voir [Sources des rappels](#sources-des-rappels))
+- datetime date_collecte    : requis ; date de la collecte qui a créé le rappel
+- date date_publication     : requis ; date de publication de la fiche lue à la création du rappel (une republication la change dans RappelConso, pas dans le rappel)
+- date date_fin_procedure   : facultatif ; fin de la procédure de rappel ou de l'affichage, si elle est connue à la création du rappel
 - string titre              : requis
+- string description_produit : facultatif ; description du produit telle que publiée (champ « modèles ou références »), texte libre
+- int id_marque             : facultatif ; ref sur la marque de la fiche, après [fusion de marques](#fusion-de-marques)
 - int id_famille            : facultatif ; ref sur la famille de produit
 - string motif              : requis ; motif du rappel (ex: présence de Listeria)
 - string risques            : facultatif ; risques encourus par le consommateur
 - string conduite_a_tenir   : facultatif ; ce que doit faire le consommateur
-- string lots               : facultatif ; identification des lots (n° de lot, DDM, DLC…), texte libre
+- string lots               : facultatif ; identification des lots (n° de lot, DDM, DLC…) : valeurs du champ d'identification qui ne sont pas des codes-barres valides (voir [Produits](#produits)), texte libre
 - string zone_geographique  : facultatif ; zone de vente, texte libre
+- boolean zone_incertaine   : requis ; vrai si la zone de vente est absente ou n'a pas pu être interprétée ; fixé à la création
 - string distributeurs      : facultatif ; liste des distributeurs telle que publiée, texte libre
 - string url_fiche          : facultatif ; lien vers la fiche officielle
 ```
 
-Les champs `distributeurs` et `zone_geographique` sont conservés tels que publiés, car les sources les fournissent en texte libre (ex: « E.Leclerc, Auchan, Magasins de proximité ») et ils ne peuvent pas toujours être rattachés à des enseignes ou des magasins.
+### Interprétation des textes libres
+
+En règle générale, les champs des rappels sont des **textes libres**, écrits différemment d'une source et d'un rappel à l'autre. Leur interprétation suit des principes communs:
+
+1. **le texte d'origine est toujours conservé** et affiché tel quel, comme du texte;
+2. des liens structurés (départements, enseignes, magasins) n'en sont tirés que par des **règles exactes**: normalisation, référentiels officiels et fichiers déclarés (écritures d'enseigne, appellations de zone), versionnés avec le code;
+3. **aucun rapprochement approché automatique**: un élément qui ne correspond exactement à rien n'est rattaché à rien. Seuls les noms de marque font exception: ils suivent la [fusion de marques](#fusion-de-marques) (noms proches, IA, décision du Product Owner);
+4. tout élément non reconnu est **signalé** (traces de la collecte), pour que le Product Owner complète les fichiers déclarés;
+5. en cas de doute sur la zone de vente, on retient **l'interprétation qui prévient le plus**: « France entière ». Mieux vaut un email de trop qu'un rappel manqué. Le rappel est alors marqué comme incertain (`zone_incertaine`), et chaque utilisateur choisit s'il veut recevoir ces rappels (voir [Correspondances incertaines](#correspondances-incertaines)). Les distributeurs ne suivent pas cette règle: un rappel dont aucune enseigne n'est reconnue n'a pas d'enseigne (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)).
+
+**Normalisation.** Tous les textes comparés le sont après la même normalisation: forme Unicode NFKC; suppression des symboles ®, ™, © et ℗; minuscules; accents retirés; « & » remplacé par « et »; ponctuation, apostrophes et tirets remplacés par des espaces; espaces multiples réduits à un seul; espaces de début et de fin retirés (ex: « Île-de-France » → « ile de france », « Carrefour Hypermarché » → « carrefour hypermarche »). Pour les noms de marque, la clé de comparaison ignore en outre les espaces (voir [Fusion de marques](#fusion-de-marques)).
+
+Champs interprétés: `zone_geographique` (voir [Rappels départements](#rappels-départements)), `distributeurs` (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)) et le nom de la marque (voir [Fusion de marques](#fusion-de-marques)). Les autres champs (`motif`, `risques`, `conduite_a_tenir`, `lots`…) sont conservés et affichés sans interprétation.
+
+### Interprétation des distributeurs
+
+Le champ `distributeurs` est une liste en texte libre qui mélange enseignes, magasins précis, producteurs et formules générales. Il est interprété ainsi:
+
+1. le texte est découpé en éléments: virgules, points-virgules, « ¤ », « / », retours à la ligne;
+2. chaque élément est normalisé, et les mots ignorés déclarés (ex: « uniquement », « seulement », « magasin », « magasins ») en sont retirés;
+3. on cherche la **plus longue [écriture d'enseigne](#écritures-denseigne)** par laquelle l'élément **commence** (mots entiers):
+   - aucune: l'élément n'est rattaché à rien et il est signalé (producteur, commerce indépendant, formule générale);
+   - une écriture, sans reste: l'enseigne est liée au rappel;
+   - une écriture suivie d'un reste: l'enseigne est liée au rappel; si le reste est le nom d'une commune identifiée sans ambiguïté dans la base officielle des codes postaux (au besoin parmi les départements du rappel), le magasin de cette enseigne dans cette commune est lié au rappel, et créé s'il n'existe pas. Sinon, seule l'enseigne est liée et le reste est signalé;
+4. si **aucune enseigne** n'est liée (champ vide, formule générale comme « toutes enseignes », « gms » ou « voir pièce jointe », ou aucune enseigne reconnue), le rappel **n'a pas d'enseigne**. Il ne correspond à aucun critère *enseigne*: il ne peut être reçu que par un autre critère (marque, produit, famille, code postal). C'est le cas d'environ la moitié des fiches (47 % des fiches nationales publiées de juillet 2024 à octobre 2026, avec une liste d'environ 70 enseignes), voir [Gestion des risques](#gestion-des-risques).
+
+Exemples:
+
+| Texte du champ `distributeurs` | Enseignes liées | Magasins liés | Éléments signalés |
+|---|---|---|---|
+| carrefour hypermarché ermont uniquement | Carrefour | Carrefour Ermont (95) | — |
+| carrefour | Carrefour | — | — |
+| saff¤soudry sas¤ferme fontaine¤fromagerie de romain¤leclerc fecamp¤coopérative u¤saisonniers¤carrefour gruchet¤netto bolbec¤intermarché fecamp¤fromagerie pauly¤2 airelles¤nsf¤magasin des 5 frères¤ | E.Leclerc, U, Carrefour, Netto, Intermarché | E.Leclerc Fécamp, Netto Bolbec, Intermarché Fécamp | saff, soudry sas, ferme fontaine, fromagerie de romain, saisonniers, fromagerie pauly, 2 airelles, nsf, des 5 frères, et « gruchet » (deux communes possibles: Gruchet-le-Valasse, Gruchet-Saint-Siméon) |
+| toute enseigne distribuant la marque auchan | aucune: le rappel **n'a pas d'enseigne** | — | toute enseigne distribuant la marque auchan |
+
+Le dernier exemple montre pourquoi l'écriture d'enseigne doit être en **début** d'élément: « auchan » y désigne une marque de distributeur, pas l'enseigne qui vend le produit.
 
 ## Sources des rappels
 
-Un même rappel peut être publié par plusieurs sources (ex: RappelConso et la page de rappels d'une enseigne). La classe sources des rappels permet de ne stocker qu'une fois chaque rappel et d'éviter les doublons lors de la collecte.
+Dans cette première version, une seule source crée des rappels: les fiches nationales de l'open data RappelConso (jeu de données `rappelconso-v2-gtin-espaces`, voir [Outils externes](#outils-externes)). 
+
+**Identification d'un rappel.** Un rappel est identifié dans RappelConso par son numéro de fiche (`numero_fiche`), jamais par son identifiant (`id`): une republication de la fiche (`numero_version` incrémenté) change son `id` et sa `date_publication`. Une republication d'une fiche déjà connue n'est pas un nouveau rappel et ne déclenche aucune alerte. Les nouveaux rappels ne sont jamais détectés par leur `date_publication`: est nouveau un rappel dont le numéro de fiche est encore inconnu. Le numéro de fiche commence par l'année et le mois de sa première publication (ex: `2026-03-0268`).
+
+**Date de lancement.** Les fiches publiées avant la date de lancement du service (paramètre de configuration) ne sont jamais lues: CADI ne reprend pas l'historique de RappelConso. Une fiche publiée avant la date de lancement et republiée après a un numéro inconnu de CADI: elle crée un rappel et déclenche les alertes, comme une fiche nouvelle. C'est voulu: le rappel est toujours en cours, et mieux vaut un email de trop qu'un rappel manqué. Le détail du rappel et l'email indiquent alors le mois de première publication, lu dans le numéro de fiche (ex: « publié initialement en mars 2026 »).
+
+**Lecture.** RappelConso est lu par l'API Explore v2.1 de data.economie.gouv.fr (voir [Outils externes](#outils-externes)). Cette API refuse toute page au-delà de la 10 000ᵉ fiche d'une requête (`offset + limit ≤ 10 000`), alors que le jeu de données en compte plus de 19 000. Chaque collecte ne lit donc que les fiches dont la `date_publication` est postérieure au début de la dernière collecte réussie, moins une **marge de recouvrement de 30 jours** (paramètre de configuration), et jamais antérieure à la date de lancement; elle les lit page par page. La marge rattrape les fiches qui arrivent dans l'open data après leur date de publication (retard de mise à jour, panne): sans elle, une telle fiche serait perdue. Elle fait relire environ 250 fiches déjà connues à chaque collecte: elles sont ignorées grâce à leur numéro. En contrepartie, un rappel supprimé par l'administrateur dont la fiche a moins de 30 jours est recréé dès la collecte suivante (voir [Suppression de données](#suppression-de-données)).
+
+**Fiches RAPEX exclues.** Les fiches RAPEX (système d'alerte rapide européen) sont exclues de cette première version: la collecte les ignore. Elles se reconnaissent ainsi: `numero_version` égal à 0, numéro de fiche au format « sr/… » (ou « or/… »), URL de fiche contenant « /rapex ». Environ 1 000 fiches par an ne sont donc pas couvertes (voir [Gestion des risques](#gestion-des-risques)). Une fiche est exclue dès qu'un de ces signes est présent.
+
+**Pages de rappels des enseignes exclues.** Les pages de rappels publiées par les enseignes ne sont pas lues dans cette première version.
+
+Avec une seule source, il n'y a pas de table des sources: chaque rappel garde le numéro de sa fiche (`numero_fiche`, unique) et la date de sa collecte (voir [Rappels](#rappels)). C'est ce numéro qui permet de ne lire qu'une fois chaque fiche lors de la collecte.
+
+## Collectes
+
+La classe collectes garde l'état de chaque collecte, pour que le backend sache, après un arrêt ou une erreur, où il en était (voir [Collecte des rappels](#collecte-des-rappels)).
 
 ```
-- int id_rappel          : requis ; ref sur le rappel
-- string source          : requis ; ex: 'rappelconso', 'carrefour'
-- string reference       : requis ; identifiant du rappel dans la source (ex: numéro de fiche RappelConso)
-- string url             : facultatif ; lien vers le rappel dans la source
-- datetime date_collecte : requis
-  unicité : (source, reference)
+- int id_collecte          : requis ; automatique
+- datetime date_debut      : requis ; début de la collecte
+- datetime date_fin        : facultatif ; fin de la collecte ; vide tant qu'elle n'est pas terminée
+- string statut            : requis ; 'en cours', 'réussie' ou 'échouée'
+- int nb_fiches_lues       : requis ; default 0
+- int nb_rappels_crees     : requis ; default 0
+```
+
+La prochaine collecte lit les fiches à partir du début de la dernière collecte réussie (moins la marge de recouvrement), ou de la date de lancement s'il n'y en a pas encore.
+
+### Rappels à traiter
+
+Cette table contient les rappels créés mais pas encore comparés aux alertes. Un rappel y est ajouté dans la même transaction que sa création; il en est retiré dans la même transaction que l'enregistrement des emails d'alerte et des envois qu'il produit. Après un arrêt du backend entre la création d'un rappel et l'envoi des alertes, le rappel reste donc à traiter, et la collecte suivante l'envoie: aucun rappel n'échappe aux alertes. La table `rappels` reste ainsi écrite une seule fois.
+
+```
+- int id_rappel : requis ; unique ; ref rappel
 ```
 
 ## Liens entre les rappels et les autres données
 
-Un rappel concerne un ou plusieurs produits, enseignes ou magasins, et inversement: ce sont des relations de type N à N, stockées dans des tables de liaison. Ces relations sont stockées dans trois tables de liaisons.
+Un rappel concerne un ou plusieurs produits, enseignes ou magasins, et inversement: ce sont des relations de type N à N, stockées dans des tables de liaison. Ces relations sont stockées dans quatre tables de liaisons.
 
 ### Rappels produits
 
@@ -482,17 +653,111 @@ Cette table fait le lien entre un rappel et un magasin.
 - int id_magasin : requis ; ref magasin
 ```
 
-La marque d'un rappel est celle de ses produits. La table `rappels_magasins` n'est renseignée que lorsque le rappel cite des magasins précis.
+La marque d'un rappel est celle de sa fiche (champ `id_marque` du rappel), pas celle de ses produits. La table `rappels_magasins` n'est renseignée que lorsque le rappel cite des magasins précis.
+
+### Rappels départements
+
+Cette table fait le lien entre un rappel et les départements de sa zone de vente.
+
+```
+- int id_rappel           : requis ; ref rappel
+- string code_departement : requis ; ref département (ex: '75', '2A', '971')
+  unicité : (id_rappel, code_departement)
+```
+
+Elle est renseignée à la création du rappel, en interprétant le champ `zone_geographique`, à l'aide du [référentiel géographique](#référentiel-géographique). Le texte d'origine reste conservé dans `zone_geographique`. Une zone désigne souvent une région (ex: « Nouvelle-Aquitaine », « Île-de-France », « Occitanie »): elle est alors remplacée par tous ses départements.
+
+Interprétation d'une zone de vente:
+
+1. le texte est normalisé (voir [Interprétation des textes libres](#interprétation-des-textes-libres)), ex: « Île-de-France » → « ile de france »;
+2. il est découpé en éléments (virgules, points-virgules, « et », retours à la ligne);
+3. chaque élément est reconnu comme:
+   - « France entière » (ou une variante: « toute la France », « national »): le rappel concerne la France entière, aucun département n'est lié;
+   - un code de département (ex: « 67 », « 2A », « 971 ») ou un nom de département (ex: « Bas-Rhin »): ce département est lié;
+   - une [appellation de zone](#appellations-de-zone) (région actuelle, ancienne région, groupement comme « France métropolitaine » ou « Outre-mer »): tous ses départements sont liés;
+4. si un seul élément n'est pas reconnu, la zone entière est considérée comme impossible à interpréter: aucun département n'est lié, le rappel reste en « France entière » et `zone_incertaine` est vrai (de même si la zone est absente). Une zone explicitement « France entière » n'est pas incertaine. L'élément inconnu est enregistré dans les traces, pour compléter les appellations de zone.
+
+La zone de vente d'un rappel est **France entière** lorsqu'aucun département ne lui est lié. C'est le cas par défaut: une zone de vente absente ou impossible à interpréter laisse le rappel en « France entière » (mieux vaut un email de trop qu'un rappel manqué). « France entière » ne dépend que de la zone de vente: un magasin lié au rappel ne la supprime pas (voir [Géographie par enseigne](#géographie-par-enseigne)). Cette information est déduite des liens et n'est pas stockée dans le rappel, qui n'est jamais modifié.
+
+### Géographie par enseigne
+
+Un rappel ne concerne pas forcément ses enseignes sur la même zone. La géographie de chaque enseigne d'un rappel est déduite de ses liens:
+
+- une enseigne citée seule dans les distributeurs (sans magasin) prend la zone de vente du rappel (départements liés, ou France entière);
+- une enseigne citée uniquement par des magasins prend la zone de ces magasins (leurs départements);
+
+La **géographie du rappel** est la réunion des géographies de ses enseignes, ou sa zone de vente s'il ne cite aucune enseigne. Elle sert à l'affichage, aux statistiques et à l'[envoi des alertes](#envoi-des-alertes).
+
+Exemple: zone de vente « France entière », distributeurs « carrefour, leclerc fecamp ». Carrefour est cité seul: il prend la France entière. E.Leclerc n'est cité que par son magasin de Fécamp: il prend la Seine-Maritime (76).
+
+| Alerte (combinaison ET) | Reçoit le rappel ? |
+|---|---|
+| Carrefour ET 67 | oui: Carrefour est concerné dans toute la France |
+| Leclerc ET 67 | non: E.Leclerc n'est concerné que dans le 76 |
+| marque X (marque du produit rappelé) ET 67 | oui: la géographie du rappel comprend la France entière |
+
+Si la zone de vente est « 68 », Carrefour prend le 68 et E.Leclerc le 76: « marque X ET 67 » ne reçoit pas le rappel.
+
+*NB: le cas d'une même enseigne citée à la fois seule et par un magasin (ex: « carrefour, carrefour ermont ») reste à trancher: zone de vente ou zone du magasin ?*
+
+## Référentiel géographique
+
+Le référentiel géographique permet de passer d'un code postal, d'un nom de département ou d'une région aux départements concernés. Contrairement aux autres données de référence, il n'est pas créé à partir des rappels: il est chargé depuis des sources officielles (voir [Gouvernance du référentiel géographique](#gouvernance-du-référentiel-géographique)).
+
+### Départements
+
+```
+- string code_departement : requis ; unique ; code officiel (ex: '01', '2A', '75', '971')
+- string nom              : requis ; ex: 'Bas-Rhin'
+- string nom_normalise    : requis ; unique ; nom normalisé pour la recherche (ex: 'bas rhin')
+```
+
+### Appellations de zone
+
+Une appellation de zone est un nom qui désigne un ensemble de départements: une région actuelle (ex: « Nouvelle-Aquitaine »), une ancienne région d'avant 2016 encore utilisée par les sources (ex: « Midi-Pyrénées », « Alsace »), ou un groupement (ex: « France métropolitaine », « Outre-mer »).
+
+```
+- int id_zone          : requis ; automatique
+- string nom           : requis ; ex: 'Nouvelle-Aquitaine'
+- string nom_normalise : requis ; unique ; ex: 'nouvelle aquitaine'
+- string type          : requis ; 'région', 'ancienne région' ou 'groupement'
+```
+
+### Zones départements
+
+Cette table fait le lien entre une appellation de zone et ses départements.
+
+```
+- int id_zone             : requis ; ref appellation de zone
+- string code_departement : requis ; ref département
+  unicité : (id_zone, code_departement)
+```
+
+## Emails d'alerte
+
+La classe emails d'alerte contient les emails adressés aux utilisateurs à l'issue d'une collecte. Un utilisateur reçoit **au plus un email d'alerte par collecte**, qui regroupe tous les nouveaux rappels correspondant à au moins une de ses alertes (voir [Envoi des alertes](#envoi-des-alertes)).
+
+```
+- int id_email                      : requis ; automatique
+- int id_user                       : requis ; destinataire
+- datetime date_creation            : requis ; fin de la collecte qui a produit l'email
+- string statut                     : requis ; 'à envoyer', 'envoyé' ou 'abandonné' ; default 'à envoyer'
+- int nb_tentatives                 : requis ; default 0
+- datetime date_prochaine_tentative : facultatif ; vide si aucune tentative n'est prévue
+- datetime date_envoi               : facultatif ; date de l'envoi réussi
+- string derniere_erreur            : facultatif ; cause du dernier échec, sans donnée personnelle
+- string empreinte_desabonnement    : requis ; empreinte (hash) du jeton du lien de désabonnement
+```
 
 ## Envois
 
-La classe envois trace les emails d'alerte envoyés aux utilisateurs. Elle évite d'envoyer deux fois la même alerte pour un même rappel et sert de preuve d'envoi.
+La classe envois indique, pour chaque email d'alerte, les rappels qu'il contient et les alertes qui les ont fait correspondre. Elle évite de signaler deux fois un même rappel pour une même alerte et sert de preuve d'envoi.
 
 ```
-- int id_alerte       : requis ; ref alerte
-- int id_rappel       : requis ; ref rappel
-- datetime date_envoi : requis
-- string statut       : requis ; 'envoyé' ou 'échec'
+- int id_email  : requis ; ref email d'alerte
+- int id_alerte : requis ; ref alerte
+- int id_rappel : requis ; ref rappel
+- boolean incertain : requis ; vrai si la correspondance est incertaine (voir [Correspondances incertaines](#correspondances-incertaines))
   unicité : (id_alerte, id_rappel)
 ```
 
@@ -511,7 +776,7 @@ La classe jetons de connexion contient les demandes de connexion par lien magiqu
 - boolean utilise        : requis ; default 'false'
 ```
 
-Utiliser le lien ou le code rend le jeton inutilisable. Les jetons expirés ou utilisés sont effacés par la [purge](#purge-des-données-supprimées).
+Utiliser le lien ou le code rend le jeton inutilisable. Les jetons expirés ou utilisés sont effacés par la [purge](#purge-des-données-expirées).
 
 ## Sessions
 
@@ -525,11 +790,15 @@ La classe sessions contient les sessions ouvertes par les utilisateurs connecté
 - datetime date_expiration : requis ; date_creation + 24 heures
 ```
 
-Une session est effacée à la déconnexion. Les sessions expirées sont effacées par la [purge](#purge-des-données-supprimées).
+Une session est effacée à la déconnexion. Les sessions expirées sont effacées par la [purge](#purge-des-données-expirées).
 
 ## Statistiques
 
 Les statistiques ne sont pas stockées: elles sont calculées à partir des rappels et de leurs liens, par exemple le nombre de rappels par enseigne, magasin, marque, produit, famille de produit ou zone géographique, et par période (mois, année).
+
+Par zone géographique, un rappel compte pour chaque département de sa géographie (voir [Géographie par enseigne](#géographie-par-enseigne)); un rappel national (France entière) compte donc pour chaque département. Les totaux par département ne s'additionnent pas pour donner le total national.
+
+Par enseigne, un rappel sans enseigne ne compte pour aucune enseigne.
 
 # Workflow
 
@@ -537,10 +806,14 @@ Les workflows réspectent la [gouvernance](#gouvernance). Ce chapitre décrit le
 
 ## Suppression de données
 
-Chaque table principale (hors tables de liaison, envois, jetons de connexion et sessions) possède une colonne `deleted` de type `boolean` qui vaut `false` par défaut.
-La suppression fonctionnelles des données n'efface pas les données, elle les marque comme *effacée* (i.e. le champ `deleted`est mis à `true`). Une donnée effacée n'est plus accessible à l'utilisateur.
+Toute suppression est **immédiate et définitive**: la donnée est effacée de la base de données. Il n'y a pas de suppression logique.
 
-Les données marquées comme effacées sont effacées définitivement un an après leur suppression (voir [Durée de conservation des données](#durée-de-conservation-des-données)). Sur demande de l'utilisateur (droit à l'oubli), un administrateur peut les effacer définitivement sans attendre ce délai.
+- **compte utilisateur** : effacement du compte, de ses alertes, de ses emails d'alerte et de leurs envois, de ses sessions et de ses jetons de connexion;
+- **alerte** : effacement de l'alerte, de ses liens avec les départements et de ses envois;
+- **donnée de référence** (par l'administrateur) : effacement de la donnée et de ses liens avec les rappels. Les références facultatives vers elle sont vidées (ex: un rappel perd sa marque, un critère d'alerte est retiré); les données qui en dépendent obligatoirement sont effacées avec elle (ex: les produits d'une famille). Une alerte qui n'a plus aucun critère est effacée;
+- **rappel** (par l'administrateur) : effacement du rappel, de ses liens et des envois qui le citent. L'effacement sert à retirer une erreur de lecture, pas à masquer un rappel publié. Comme la collecte ne relit que les fiches récentes, le rappel n'est recréé que si RappelConso republie la fiche, ou si elle a moins de 30 jours (marge de recouvrement de la collecte, voir [Sources des rappels](#sources-des-rappels)): il revient alors comme un nouveau rappel, et les emails d'alerte repartent. C'est voulu: l'administrateur en porte la responsabilité.
+
+Toute suppression faite par l'administrateur est écrite dans les traces: date, type et identifiant de la donnée effacée. L'auteur y est noté « administrateur », jamais son adresse email ni son identifiant d'utilisateur.
 
 ## Workflows des utilisateurs
 
@@ -559,7 +832,7 @@ Tout utilisateur doit se connecter pour utiliser l'application. La connexion et 
 
 ### Modification d'un utilisateur
 
-Tout utilisateur authentifié peut modifier sa fiche. 
+Tout utilisateur authentifié peut modifier sa fiche. Un utilisateur désabonné peut aussi s'y réabonner aux emails d'alerte (le champ `desabonne_at` est vidé; voir [Désabonnement des emails d'alerte](#désabonnement-des-emails-dalerte)).
 
 ![](umldiagrams/workflows/usermodification.png)
 
@@ -571,14 +844,13 @@ Tout utilisateur peut se déconnecter de l'application. La session est effacée 
 
 ### Suppression d'un utilisateur
 
-Tout utilisateur peut supprimer son compte. Les informations et les données qu'il a insérées dans l'application sont supprimées selon les gouvernances applicables.
-Ses sessions sont fermées.
+Tout utilisateur peut supprimer son compte, après confirmation. Son compte, ses alertes, ses emails d'alerte et leurs envois, ses sessions et ses jetons de connexion sont effacés immédiatement et définitivement (voir [Suppression de données](#suppression-de-données)). L'utilisateur est déconnecté.
 
 ![](umldiagrams/workflows/usersuppression.png)
 
 ### Export des données d'un utilisateur
 
-Tout utilisateur authentifié peut exporter ses données (droit à la portabilité): son compte, ses alertes et les emails d'alerte qui lui ont été envoyés. *NB: le format du fichier reste à choisir (ex: JSON ou CSV).*
+Tout utilisateur authentifié peut exporter ses données (droit à la portabilité): son compte, ses alertes et les emails d'alerte qui lui ont été envoyés, dans un fichier au format JSON.
 
 ![](umldiagrams/workflows/userexport.png)
 
@@ -604,34 +876,72 @@ Tout utilisateur a le droit de supprimer ses propres alertes.
 
 ### Envoi des alertes
 
-À la fin de chaque collecte, le backend compare chaque nouveau rappel à chaque alerte non supprimée, et envoie un email au propriétaire de chaque alerte qui correspond.
+À la fin de chaque collecte, le backend compare chaque [rappel à traiter](#rappels-à-traiter) (fiche RappelConso dont le numéro était inconnu) à chaque alerte. Il envoie ensuite **un seul email** à chaque utilisateur dont au moins une alerte correspond.
+
+Une alerte ne reçoit que les rappels collectés après sa configuration: un rappel n'est comparé à une alerte que si sa date de collecte (`date_collecte`) est postérieure à la date de configuration de l'alerte (`date_configuration`, mise à jour à chaque modification). Les rappels antérieurs restent consultables, et l'aperçu de la page de création d'alerte les montre.
 
 Un critère d'une alerte correspond à un rappel lorsque:
 
-- **enseigne** : l'enseigne est liée au rappel;
-- **magasin** : le magasin est lié au rappel;
-- **marque** : la marque est celle d'un produit lié au rappel;
-- **produit** : le produit est lié au rappel;
-- **famille de produit** : la famille est celle du rappel ou celle d'un produit lié au rappel;
-- **code postal** : *NB: règle à définir (code postal d'un magasin lié au rappel ? zone géographique du rappel ?).*
+- **enseigne** : l'enseigne est liée au rappel; un rappel sans enseigne ne correspond à aucun critère *enseigne* (voir [Interprétation des distributeurs](#interprétation-des-distributeurs));
+- **marque** : la marque retenue du rappel est la marque retenue de l'alerte (voir [Fusion de marques](#fusion-de-marques));
+- **produit** : le produit (code-barres) est lié au rappel;
+- **famille de produit** : la famille est celle du rappel (jamais celle de ses produits, qui gardent la famille de la première fiche qui les a cités);
+- **code postal** : l'un des départements du code postal de l'alerte (table [alertes départements](#alertes-départements)) fait partie de la géographie retenue (voir [Géographie par enseigne](#géographie-par-enseigne)); une géographie « France entière » comprend tous les départements. La géographie retenue est:
+  - si l'alerte a la combinaison `ET` et un critère *enseigne*: la géographie de cette enseigne pour ce rappel (ex: « Leclerc ET 67 » ne correspond pas à un rappel « France entière » qui ne cite E.Leclerc que par son magasin de Fécamp);
+  - sinon: la géographie du rappel.
 
-Selon la `combinaison` de l'alerte, tous les critères renseignés doivent correspondre (`ET`) ou au moins un (`OU`). Un même rappel ne déclenche jamais deux emails pour une même alerte: chaque envoi est enregistré dans la table [envois](#envois).
+Selon la `combinaison` de l'alerte, tous les critères renseignés doivent correspondre (`ET`) ou au moins un (`OU`). Un même rappel n'est jamais signalé deux fois pour une même alerte: chaque correspondance est enregistrée dans la table [envois](#envois).
+
+**Regroupement.** Les correspondances sont regroupées par utilisateur: l'email d'une collecte liste les nouveaux rappels qui le concernent, chacun **une seule fois**, même si plusieurs de ses alertes y correspondent. Pour chaque rappel, l'email affiche d'abord la conduite à tenir et les risques, puis les alertes qui l'ont déclenché (ex: « vos alertes *Marque X* et *Carrefour, 67* ») et un lien vers le détail du rappel. Les utilisateurs désabonnés (champ `desabonne_at` renseigné) ne reçoivent rien. Les correspondances incertaines ne sont retenues que pour les utilisateurs dont la politique de risque est prudente (voir [Correspondances incertaines](#correspondances-incertaines)).
+
+**Nouvelles tentatives.** L'email et ses envois sont d'abord enregistrés en base (statut `à envoyer`), puis l'email est envoyé: un arrêt du backend pendant l'envoi ne fait donc perdre aucun email.
+
+- en cas d'**échec temporaire** (prestataire d'envoi indisponible, délai dépassé, refus temporaire du serveur destinataire), l'envoi est retenté avec un délai croissant (ex: 5 minutes, 30 minutes, 2 heures, 6 heures), en au plus 5 tentatives (ex); au-delà, l'email passe au statut `abandonné`;
+- en cas d'**échec définitif** (ex: adresse inexistante), l'email n'est pas retenté et passe directement au statut `abandonné`;
+- chaque email porte un identifiant unique transmis au prestataire d'envoi, pour qu'une nouvelle tentative ne produise pas de doublon.
+
+*NB (à traiter plus tard): volume d'envoi. Une alerte qui ne porte que sur un code postal reçoit environ 70 % des rappels (rappels « France entière »). Avec 100 000 inscrits, une collecte peut produire plusieurs dizaines de milliers d'emails par jour. Le dimensionnement et le coût du prestataire d'envoi, ses limites de débit et la réputation du domaine d'envoi restent à étudier.*
 
 ![](umldiagrams/workflows/alerteenvoi.png)
+
+### Correspondances incertaines
+
+Un critère correspond **de façon incertaine** lorsqu'il ne correspond que grâce à une interprétation par défaut. Seul le critère *code postal* est concerné: il correspond de façon incertaine lorsqu'il ne correspond que par la zone de vente du rappel, laissée en « France entière » parce qu'elle est incertaine (`zone_incertaine`), et non par un magasin lié.
+
+Une correspondance entre une alerte et un rappel est incertaine si, avec la combinaison `ET`, au moins un critère correspond de façon incertaine; avec la combinaison `OU`, si tous les critères qui correspondent le font de façon incertaine.
+
+Chaque utilisateur choisit sa **politique de risque** (champ `politique_risque`, page *Mon compte*):
+
+- **prudente** (par défaut): il reçoit aussi les correspondances incertaines. Dans l'email, ces rappels sont signalés comme tels (ex: « zone de vente non précisée: ce rappel vous est signalé par prudence »);
+- **stricte**: il ne reçoit que les correspondances certaines. Les correspondances incertaines ne sont ni envoyées ni enregistrées.
+
+### Désabonnement des emails d'alerte
+
+Chaque email d'alerte permet de se désabonner en un clic, selon la [RFC 8058](https://www.rfc-editor.org/rfc/rfc8058), exigée par les principales messageries pour les envois en nombre:
+
+- l'email porte les en-têtes `List-Unsubscribe: <https://<domaine>/api/desabonnement/<jeton>>` et `List-Unsubscribe-Post: List-Unsubscribe=One-Click`. La messagerie de l'utilisateur envoie alors une requête `POST` à cette adresse, sans cookie ni confirmation, et l'utilisateur est désabonné. Une requête `GET` à cette adresse ne désabonne pas: elle redirige vers la [page de désabonnement](#pages-publiques);
+- l'email contient aussi un lien visible « Ne plus recevoir ces alertes », qui ouvre la page de désabonnement. Comme pour le lien magique, l'ouverture de la page ne désabonne pas: c'est son bouton qui désabonne, pour que les filtres de sécurité des messageries, qui ouvrent les liens, ne désabonnent pas l'utilisateur à sa place;
+- le jeton est tiré au hasard et propre à chaque email; seule son empreinte est stockée; il ne permet que le désabonnement (ni connexion, ni accès aux données) et n'est jamais écrit dans les traces;
+- se désabonner arrête **tous** les emails d'alerte de l'utilisateur (champ `desabonne_at`); son compte et ses alertes sont conservés. Il peut se réabonner depuis la page *Mon compte*;
+- les emails de connexion (lien magique) ne sont pas concernés: ils ne sont envoyés qu'à la demande de l'utilisateur.
 
 ## Workflows des rappels
 
 ### Collecte des rappels
 
-Le backend (composant ``service lecture``) lit régulièrement les sources de rappels produit: l'open data RappelConso et les pages de rappel des enseignes. *NB: la fréquence de collecte reste à définir.*
+Le backend (composant ``service lecture``) lit régulièrement l'open data RappelConso, seule source de rappels de cette première version. La collecte a lieu une fois par jour. Elle ne lit que les fiches publiées depuis la dernière collecte réussie, page par page (voir [Sources des rappels](#sources-des-rappels)); son état est enregistré dans la table [collectes](#collectes).
 
-Pour chaque rappel lu:
+Pour chaque fiche RappelConso lue:
 
-- s'il est déjà connu dans cette source, il est mis à jour si la source l'a modifié (ex: fin de la procédure de rappel);
-- s'il est déjà connu dans une autre source, la nouvelle source est ajoutée au rappel existant, sans créer de doublon;
-- sinon, le rappel est créé, ainsi que les données de référence qu'il mentionne et ses liens avec les produits, enseignes et magasins.
+- si c'est une fiche RAPEX, elle est ignorée;
+- si son numéro de fiche (`numero_fiche`) est déjà connu, elle est ignorée, même si elle a été republiée (nouvel `id`, nouvelle `date_publication`): un rappel n'est jamais modifié et une republication ne déclenche aucune alerte (voir [Gouvernance des rappels](#gouvernance-des-rappels));
+- sinon, le rappel est créé, ainsi que les données de référence qu'il mentionne et ses liens avec les produits, enseignes, magasins et départements, obtenus en interprétant ses textes libres (voir [Interprétation des textes libres](#interprétation-des-textes-libres)); sa marque est reconnue par la [fusion de marques](#fusion-de-marques). Les éléments non reconnus sont signalés. Le rappel est ajouté aux [rappels à traiter](#rappels-à-traiter), dans la même transaction.
 
-À la fin de la collecte, les alertes sont envoyées pour les nouveaux rappels (voir [Envoi des alertes](#envoi-des-alertes)).
+À la fin de la collecte, les alertes sont envoyées pour tous les rappels à traiter, y compris ceux qu'une collecte précédente interrompue a laissés. La collecte est alors marquée comme réussie.
+
+**Reprise sur erreur.** Si la collecte échoue (API indisponible, arrêt du backend…), elle est marquée comme échouée, ou reste « en cours » si le backend s'est arrêté. La collecte suivante repart du début de la dernière collecte réussie: les fiches déjà créées sont ignorées grâce à leur numéro, et les rappels restés à traiter sont envoyés.
+
+**Traces.** Chaque collecte écrit dans les traces son début, sa fin, son statut, le nombre de fiches lues et de rappels créés, et les éléments non reconnus. L'exploitant configure une alerte sur ces traces (ex: aucune collecte réussie depuis 48 heures, ou une collecte qui ne lit aucune fiche plusieurs jours de suite), pour qu'une panne de la collecte ou un changement de format de RappelConso ne passe pas inaperçu.
 
 ![](umldiagrams/workflows/rappelcollecte.png)
 
@@ -647,13 +957,15 @@ Les données de référence sont les marques, les produits, les familles de prod
 
 ### Création et modification d'une donnée de référence
 
-Les données de référence sont créées et modifiées uniquement par le backend, lors de la collecte, à partir des informations contenues dans les rappels. Aucun utilisateur ne peut les créer ni les modifier.
+Les marques, produits, familles de produits et magasins sont créés et modifiés uniquement par le backend, lors de la collecte, à partir des informations contenues dans les rappels. Les fusions de marques sous le seuil sont décidées par le Product Owner dans un fichier versionné avec le code (voir [Fusion de marques](#fusion-de-marques)). Les enseignes, leurs écritures et le référentiel géographique viennent de fichiers déclarés ou de sources officielles (voir [Interprétation des textes libres](#interprétation-des-textes-libres)). Aucun utilisateur ne peut les créer ni les modifier depuis l'application.
 
 ![](umldiagrams/workflows/referentielmiseajour.png)
 
 ### Suppression d'une donnée par l'administrateur
 
-Seul l'administrateur peut supprimer une donnée de référence ou un rappel. La donnée est marquée comme supprimée (voir [Suppression de données](#suppression-de-données)).
+Seul l'administrateur peut supprimer un rappel ou une donnée de référence (marque, produit, famille de produit, magasin; les enseignes relèvent du fichier déclaré). La donnée est effacée immédiatement et définitivement, avec ses liens (voir [Suppression de données](#suppression-de-données)).
+
+Un rappel supprimé dont RappelConso republie ensuite la fiche, ou dont la fiche a moins de 30 jours (marge de recouvrement), est recréé à la collecte suivante, et les emails d'alerte repartent. C'est voulu: l'administrateur en porte la responsabilité. Chaque suppression est écrite dans les traces, sans identifier l'administrateur (voir [Suppression de données](#suppression-de-données)).
 
 ![](umldiagrams/workflows/adminsuppression.png)
 
@@ -675,17 +987,11 @@ Cette première version gère un seul administrateur, sans second facteur: la s�
 
 ![](umldiagrams/workflows/adminconnexion.png)
 
-### Purge des données supprimées
+### Purge des données expirées
 
-Une tâche planifiée efface définitivement, chaque jour, les données marquées comme supprimées depuis plus d'un an, les traces d'accès de plus d'un an, ainsi que les jetons de connexion et les sessions expirés ou utilisés (voir [Durée de conservation des données](#durée-de-conservation-des-données)).
+Une tâche planifiée efface chaque jour les traces d'accès de plus d'un an, ainsi que les jetons de connexion et les sessions expirés ou utilisés (voir [Durée de conservation des données](#durée-de-conservation-des-données)).
 
 ![](umldiagrams/workflows/purge.png)
-
-### Droit à l'oubli
-
-Lorsqu'un utilisateur demande l'effacement de ses données sans attendre la purge, un administrateur vérifie l'identité du demandeur, puis efface définitivement son compte, ses alertes, les envois associés, ses sessions et ses jetons de connexion. L'utilisateur reçoit une confirmation par email. *NB: le canal de demande (formulaire, email dédié) reste à définir.*
-
-![](umldiagrams/workflows/droitoubli.png)
 
 # Backend
 Le backend gère la partie métier. Il stocke les données dans une base de données. Il propose une API de communication pour le frontend. Il récupère les évènements liés aux rappels de produits pour mettre à jour sa base de données et recalculer les statistiques.
@@ -701,6 +1007,22 @@ Le backend de l'application implémente la logique métier de l'application. Le 
    3. le composant ``service base de données``, en charge de l'interaction avec le système de gestion de base de données. Ce service est le seul autorisé à lire et écrire la DB.
    4. le composant ``service notification``, en charge de l'envoi des alertes par email aux utilisateurs concernés par un nouveau rappel produit.
 
+**Instances.** Le service lecture (collecte) et le service notification (envoi des emails) tournent chacun en **une seule instance**: RappelConso est la seule source de vérité, et une collecte par jour ne demande aucune montée en charge. Deux collectes ou deux envois simultanés produiraient des emails en double. Le déploiement doit donc garantir qu'il n'en existe jamais deux à la fois: dans le fichier docker compose, ces deux services n'ont qu'un seul conteneur (jamais de `--scale` ni de `replicas` supérieur à 1). Lors d'une mise à jour, docker compose arrête l'ancien conteneur avant de démarrer le nouveau. Seule l'API, qui sert le frontend, peut tourner en plusieurs conteneurs pour absorber les pics de consultation.
+
+**Déploiement.** L'application est déployée avec **docker compose**, sur un serveur OVH en France: un conteneur par service (frontend, API, service lecture, service notification, PostgreSQL), dans des réseaux séparés (seul le backend atteint PostgreSQL). Les secrets (adresse de l'administrateur, mot de passe de la base, clé du prestataire d'envoi) sont fournis par des fichiers de secrets docker compose, jamais en clair dans le fichier compose ni dans les images.
+
+**Un seul serveur.** Docker compose fait tourner tous les conteneurs sur une seule machine. Dans cette première version:
+
+- monter en charge consiste à ajouter des conteneurs d'API sur ce serveur, ou à prendre un serveur plus puissant; répartir l'application sur plusieurs serveurs demandera un autre outil de déploiement;
+- une panne du serveur arrête tout le service (site et alertes). C'est une limite assumée: les rappels restent publiés par RappelConso, et la [reprise sur erreur](#collecte-des-rappels) de la collecte envoie au redémarrage les alertes des rappels publiés pendant la panne (dans la limite de la marge de recouvrement de 30 jours).
+
+**Sauvegardes.** La base de données est sauvegardée chaque jour (ex: `pg_dump`):
+
+- la sauvegarde est chiffrée et stockée hors du serveur, chez OVH en France (ex: stockage objet), pour survivre à la perte du serveur;
+- chaque sauvegarde est conservée 30 jours, puis effacée;
+- la restauration est testée régulièrement (ex: chaque mois, sur un environnement de test): une sauvegarde jamais restaurée n'est pas une sauvegarde;
+- les sauvegardes contiennent des données personnelles: un compte supprimé y reste jusqu'à l'expiration de la dernière sauvegarde qui le contient (voir [Durée de conservation des données](#durée-de-conservation-des-données)). Après une restauration, les comptes supprimés depuis la sauvegarde sont effacés à nouveau: chaque suppression de compte est écrite dans les traces avec l'identifiant de l'utilisateur (`id_user`), jamais son adresse email.
+
 ![Architecture backend](umldiagrams/backend.png)
 
 
@@ -708,7 +1030,7 @@ Le backend de l'application implémente la logique métier de l'application. Le 
 
 L'API du backend est une API REST (HTTP et JSON), servie sous `https://<domaine>/api/`. Elle est décrite par un contrat OpenAPI 3.1, `doc/api/openapi.yaml`, qui fait foi pour le backend comme pour le frontend: le code serveur Go et le client TypeScript en sont générés (ex: oapi-codegen, openapi-typescript).
 
-Les réponses publiques (rappels, statistiques) peuvent être mises en cache (`Cache-Control`, `ETag`); les réponses propres à un utilisateur ne le sont jamais (`Cache-Control: no-store`).
+Les données communes (rappels, données de référence, statistiques) ne sont accessibles qu'aux utilisateurs connectés (voir [Gouvernance](#gouvernance)). Elles ne sont donc jamais placées dans un cache partagé (CDN, proxy), qui les servirait sans vérifier la session. Elles peuvent être mises en cache par le backend, après vérification de la session, et par le navigateur (`Cache-Control: private`, `ETag`). Les données personnelles ne sont jamais mises en cache (`Cache-Control: no-store`).
 
 *à faire*: le contrat lui-même.
 
@@ -740,12 +1062,13 @@ Le plan de navigation ci-dessous montre les pages du frontend et les passages de
 
 | Page | Workflows |
 |---|---|
+| Désabonnement | [Désabonnement des emails d'alerte](#désabonnement-des-emails-dalerte) |
 | Connexion, saisie du code, page du lien magique | [Connexion par lien magique](#connexion-par-lien-magique), [Connexion d'un administrateur](#connexion-dun-administrateur) |
 | Mes alertes, créer / modifier une alerte | [Création](#création-dune-alerte), [modification](#modification-dune-alerte) et [suppression](#suppression-dune-alerte) d'une alerte |
 | Rappels, détail d'un rappel | [Consultation des rappels](#consultation-des-rappels) |
 | Statistiques | [Consultation des statistiques](#consultation-des-statistiques) |
-| Mon compte | [Modification](#modification-dun-utilisateur), [déconnexion](#déconnexion-dun-utilisateur), [suppression](#suppression-dun-utilisateur) et [export des données](#export-des-données-dun-utilisateur) d'un utilisateur, [droit à l'oubli](#droit-à-loubli) |
-| Administration | [Suppression d'une donnée par l'administrateur](#suppression-dune-donnée-par-ladministrateur), [droit à l'oubli](#droit-à-loubli) |
+| Mon compte | [Modification](#modification-dun-utilisateur), [déconnexion](#déconnexion-dun-utilisateur), [suppression](#suppression-dun-utilisateur) et [export des données](#export-des-données-dun-utilisateur) d'un utilisateur |
+| Administration | [Suppression d'une donnée par l'administrateur](#suppression-dune-donnée-par-ladministrateur) |
 
 ## Interface utilisateur
 
@@ -763,34 +1086,35 @@ Le plan de navigation ci-dessous montre les pages du frontend et les passages de
 2. **Connexion** : un seul champ, l'adresse email. Après validation, la page affiche toujours le même message (« si l'adresse est valide, un email vous a été envoyé ») et un champ pour saisir le code à 6 chiffres.
 3. **Page du lien magique** : ouverte par le lien reçu par email, elle affiche uniquement un bouton « Se connecter ». Si le lien a expiré ou a déjà été utilisé, elle l'indique et propose de recevoir un nouveau lien.
 4. **Pages légales** : mentions légales et politique de confidentialité.
+5. **Page de désabonnement** : ouverte par le lien en bas d'un email d'alerte, sans connexion. Elle affiche un bouton « Ne plus recevoir d'alertes par email », puis confirme le désabonnement et indique qu'on peut se réabonner depuis *Mon compte*.
 
 ### Pages de l'utilisateur connecté
 
-5. **Mes alertes** (tableau de bord, page d'arrivée après la connexion) : liste des alertes de l'utilisateur, résumées en une phrase chacune, et derniers rappels qui leur correspondent. Si l'utilisateur n'a encore aucune alerte, la page l'invite à en créer une.
-6. **Créer / modifier une alerte** : un formulaire avec les critères (marque, produit, famille de produit, enseigne, magasin, code postal):
+6. **Mes alertes** (tableau de bord, page d'arrivée après la connexion) : liste des alertes de l'utilisateur, résumées en une phrase chacune, et derniers rappels qui leur correspondent. Si l'utilisateur n'a encore aucune alerte, la page l'invite à en créer une.
+7. **Créer / modifier une alerte** : un formulaire avec les critères (marque, produit, famille de produit, enseigne, code postal):
    - chaque critère propose une saisie avec suggestions automatiques, parmi les données connues de l'application;
    - les familles de produits sont présentées en deux niveaux (catégorie, puis sous-catégorie);
    - le choix de la combinaison n'apparaît que si au moins deux critères sont renseignés, sous forme de question simple: « Être prévenu si **tous** ces critères correspondent (ET) » ou « si **au moins un** correspond (OU) »;
    - un résumé en français indique ce que fait l'alerte (ex: « Vous serez prévenu de tout rappel d'un produit de la marque X vendu chez Carrefour »);
-   - un aperçu montre les rappels des 12 derniers mois qui auraient déclenché l'alerte, pour que l'utilisateur vérifie qu'elle correspond à ce qu'il attend;
+   - un aperçu montre les rappels des 12 derniers mois (au plus depuis la date de lancement du service) qui auraient déclenché l'alerte, selon la politique de risque de l'utilisateur, pour qu'il vérifie qu'elle correspond à ce qu'il attend; les rappels incertains y sont signalés;
    - l'enregistrement est impossible tant qu'aucun critère n'est renseigné.
-7. **Rappels** : liste des rappels, du plus récent au plus ancien, avec une recherche par nom ou par code-barres et des filtres (marque, famille, enseigne, magasin, code postal, période).
-8. **Détail d'un rappel** : conduite à tenir et risques en premier, puis produit, photo, lots concernés, motif, distributeurs, magasins, zone de vente, dates, et liens vers la fiche officielle et vers chaque source. Un bouton « Créer une alerte » ouvre le formulaire pré-rempli avec la marque ou le produit du rappel.
-9. **Statistiques** : graphiques du nombre de rappels selon un axe (enseigne, magasin, marque, produit, famille, zone géographique) et une période.
-10. **Mon compte** : prénom et nom modifiables, adresse email, export des données, demande de droit à l'oubli, déconnexion et suppression du compte. La suppression du compte demande une confirmation. *NB: changer d'adresse email devra être confirmé par un lien envoyé à la nouvelle adresse; ce workflow reste à décrire.*
+8. **Rappels** : liste des rappels, du plus récent au plus ancien, avec une recherche par nom ou par code-barres et des filtres (marque, famille, enseigne, magasin, code postal, période).
+9. **Détail d'un rappel** : conduite à tenir et risques en premier, puis produit, photo, lots concernés, motif, distributeurs, magasins, zone de vente, dates, et lien vers la fiche officielle. Un bouton « Créer une alerte » ouvre le formulaire pré-rempli avec la marque ou le produit du rappel.
+10. **Statistiques** : graphiques du nombre de rappels selon un axe (enseigne, magasin, marque, produit, famille, zone géographique) et une période.
+11. **Mon compte** : prénom et nom modifiables, adresse email, politique de risque (« recevoir aussi les rappels dont la zone de vente n'est pas précisée », cochée par défaut, avec une explication de ce que l'on risque de manquer en la décochant), réabonnement aux emails d'alerte après un désabonnement, export des données, déconnexion et suppression du compte. La suppression du compte demande une confirmation. Le changement d'adresse email est hors du périmètre de cette première version.
 
 ### Pages d'administration
 
 Visibles uniquement par l'administrateur:
 
-11. **Rappels et données de référence** : recherche et suppression d'un rappel, d'une marque, d'un produit, d'une famille de produit, d'une enseigne ou d'un magasin.
-12. **Demandes de droit à l'oubli** : suivi et traitement des demandes. *NB: dépend du canal de demande, qui reste à définir.*
+12. **Rappels et données de référence** : recherche et suppression d'un rappel, d'une marque, d'un produit, d'une famille de produit ou d'un magasin.
 
 ## Plan de test
 
 - **tests unitaires** des composants (ex: Vitest et React Testing Library): affichage, formulaires, règles de saisie (au moins un critère, choix ET/OU, format du code à 6 chiffres);
 - **tests de bout en bout** (ex: Playwright), sur un environnement de test avec une boîte mail de test pour recevoir les liens de connexion (ex: Mailpit). Parcours couverts:
   - connexion par lien et par code, lien expiré ou déjà utilisé, déconnexion, expiration de la session après 24 heures;
+  - réception d'un seul email par collecte quand plusieurs alertes correspondent au même rappel; avec la politique prudente, un rappel incertain est reçu et signalé comme tel; avec la politique stricte, il n'est pas reçu; désabonnement en un clic (en-têtes `List-Unsubscribe`, requête `POST`) et par la page de désabonnement, puis réabonnement depuis *Mon compte*;
   - création, modification et suppression d'une alerte, avec et sans combinaison ET/OU;
   - recherche d'un rappel, consultation de son détail, création d'une alerte depuis ce détail;
   - export des données, suppression du compte;
@@ -804,18 +1128,28 @@ Visibles uniquement par l'administrateur:
 
 | Risque | Conséquence | Mesure |
 |---|---|---|
-| Un texte issu d'une source de rappels (page d'enseigne, PDF…) contient du code malveillant | Exécution de code dans le navigateur de l'utilisateur (XSS) | Les textes des rappels sont toujours affichés comme du texte, jamais interprétés comme du HTML; politique de sécurité du contenu (CSP) stricte. |
+| Un texte issu d'une fiche de rappel (texte libre saisi par le professionnel) contient du code malveillant | Exécution de code dans le navigateur de l'utilisateur (XSS) | Les textes des rappels sont toujours affichés comme du texte, jamais interprétés comme du HTML; politique de sécurité du contenu (CSP) stricte. |
 | L'utilisateur comprend mal la combinaison ET/OU | Il se croit prévenu alors que son alerte ne correspondra jamais, ou reçoit trop d'emails | Résumé de l'alerte en français et aperçu des rappels passés qui l'auraient déclenchée. |
-| L'utilisateur veut suivre une marque ou un produit qui n'a encore jamais été rappelé | Impossible de créer l'alerte: les marques et produits ne sont créés qu'à partir des rappels | *NB: à traiter dans le modèle de données (ex: permettre une marque saisie librement).* |
+| L'utilisateur veut suivre une marque ou un produit qui n'a encore jamais été rappelé | Impossible de créer l'alerte: les marques et produits ne sont créés qu'à partir des rappels | Limite assumée: une alerte ne peut porter que sur des marques et des produits déjà apparus dans un rappel. Le formulaire de création ne propose que ces données. |
+| Un utilisateur en politique de risque stricte ne reçoit pas un rappel incertain qui le concernait | Il n'est pas prévenu d'un rappel qui le concerne | Politique prudente par défaut; le choix de la politique stricte est explicite et explique ce que l'utilisateur risque de manquer. |
+| Les fiches RAPEX ne sont pas collectées | Environ 1 000 fiches par an ne sont pas couvertes (voitures surtout, mais aussi des jouets et de la puériculture): leurs rappels ne sont pas signalés | Limite assumée pour la première version: seules les fiches nationales de RappelConso créent des rappels (voir [Sources des rappels](#sources-des-rappels)). |
+| La fiche ne cite pas l'enseigne qui vend le produit (« gms », « voir pièce jointe », liste incomplète) | Une alerte qui ne porte que sur une enseigne ne reçoit pas le rappel, alors que le produit y est vendu | Limite assumée: un rappel sans enseigne n'a pas d'enseigne. Le formulaire d'alerte et l'aperçu invitent à ajouter un autre critère (marque, produit, famille, code postal) avec la combinaison OU. Les éléments non reconnus sont signalés pour compléter le fichier déclaré des enseignes. |
+| La collecte échoue ou RappelConso change de format | Aucun rappel n'est collecté ni signalé, sans que personne ne le voie | Reprise sur erreur (table [collectes](#collectes), [rappels à traiter](#rappels-à-traiter)); traces de chaque collecte et alerte de l'exploitant sur ces traces (voir [Collecte des rappels](#collecte-des-rappels)). |
+| La collecte n'a lieu qu'une fois par jour | Un rappel peut n'être signalé à l'utilisateur que jusqu'à 24 heures après sa publication par la source | Choix assumé pour la première version: CADI complète les canaux officiels (RappelConso, affichage en magasin) sans les remplacer. La fréquence de collecte est un paramètre de configuration: elle pourra être augmentée (ex: RappelConso toutes les heures) sans changer l'architecture. |
 | L'email de connexion arrive en retard ou dans les indésirables | L'utilisateur ne peut pas se connecter | Prestataire d'envoi fiable; la page de connexion explique de vérifier les indésirables et permet de demander un nouvel email. |
 | Le backend est indisponible | Le site ne fonctionne plus | Message d'erreur clair; les alertes déjà configurées continuent d'être envoyées par email dès le retour du backend. |
-| Forte affluence (jusqu'à 100 000 utilisateurs simultanés) | Lenteur du site | Le frontend est fait de fichiers statiques, faciles à servir en grand nombre (cache, réseau de diffusion hébergé en France ou dans l'UE). |
+| Le serveur tombe en panne (tout tourne sur un seul serveur, avec docker compose) | Le site et les alertes s'arrêtent jusqu'à la remise en service | Limite assumée pour la première version. Au redémarrage, la reprise sur erreur de la collecte envoie les alertes des rappels publiés pendant la panne (voir [Architecture du backend](#architecture-1)). |
+| Le serveur ou sa base de données est perdu | Perte des comptes et des alertes | Sauvegarde quotidienne chiffrée, stockée hors du serveur chez OVH en France, conservée 30 jours; restauration testée régulièrement. |
+| Forte affluence (pic de consultation après un rappel médiatisé) | Lenteur du site | Le frontend est fait de fichiers statiques, faciles à servir en grand nombre (cache, réseau de diffusion hébergé en France ou dans l'UE). |
 | Une bibliothèque JavaScript utilisée par le frontend est compromise ou vulnérable | Faille de sécurité | Peu de dépendances, versions figées (*lockfile*), audit automatique des vulnérabilités et mises à jour régulières. |
 | Un service tiers (police, statistiques, CDN) collecte des données sur les visiteurs | Non-conformité RGPD | Aucun service tiers: toutes les ressources sont servies depuis le domaine de CADI. |
 
 # Outils externes
 
-- Open data  : https://www.data.gouv.fr/dataservices/explore-api-v2-48
+- Open data  : https://www.data.gouv.fr/dataservices/explore-api-v2-48 ; fiches RappelConso, jeu de données `rappelconso-v2-gtin-espaces` (voir [Sources des rappels](#sources-des-rappels))
+- Modèle d'IA de la [fusion de marques](#fusion-de-marques) : reste à choisir (voir le NB de cette section)
+- Base officielle des codes postaux (La Poste, open data) : correspondance entre codes postaux, communes et départements, https://www.data.gouv.fr/fr/datasets/base-officielle-des-codes-postaux/
+- Code officiel géographique (INSEE) : liste officielle des départements et des régions, et correspondance entre départements et régions, https://www.insee.fr/fr/information/2560452
 
 # Glossaire
 
