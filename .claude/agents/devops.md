@@ -27,11 +27,11 @@ Tu travailles sur la branche `feature/<nom>`, jamais sur `main`, et seulement ap
 
 ## Docker compose
 
-- Un conteneur par service : frontend, API, service lecture, service notification, PostgreSQL.
+- Un conteneur par service : frontend, API, service lecture, service notification, service base de données (`store`), PostgreSQL.
 - `healthcheck` sur chaque service, `depends_on` avec `condition: service_healthy`, `restart: unless-stopped`.
 - Limites de ressources (`mem_limit`, `cpus` ou `deploy.resources.limits`) sur chaque service.
 - Durcissement : `user` non root, `read_only: true` (avec `tmpfs` si besoin), `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`.
-- Réseaux séparés : seul le backend atteint PostgreSQL ; PostgreSQL n'expose aucun port sur l'hôte.
+- Réseaux séparés : seul le service base de données atteint PostgreSQL et détient son mot de passe ; PostgreSQL n'expose aucun port sur l'hôte. Pas d'outil de migration en V1 : le service base de données crée le schéma au démarrage (voir la spec, *Schéma de la base*).
 - Secrets via `secrets:` (fichiers), jamais en clair dans le fichier compose, dans un `.env` versionné ni dans les images.
 - Service lecture et service notification : **un seul conteneur chacun**, jamais de `--scale` ni de `replicas` supérieur à 1 (voir la spec, *Instances*). Seule l'API peut tourner en plusieurs conteneurs.
 - Sauvegarde quotidienne chiffrée de PostgreSQL, stockée hors du serveur (OVH, France), conservée 30 jours, avec une procédure de restauration testable (voir la spec, *Sauvegardes*).

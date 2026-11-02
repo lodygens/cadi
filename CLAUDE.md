@@ -64,11 +64,11 @@ doc/securite/ rapports et modèle de menace    (agent securite)
 ### Organisation git
 
 - Le dépôt doit être sous git : la review se fait sur des diffs.
-- **Une branche par feature** (`feature/<nom-court>`), créée par le PO à partir de `main`. Aucun agent ne travaille sur `main`.
-- Tous les agents travaillent **dans la copie courante, sur cette branche**. Il n'y a pas de worktree : chaque étape voit directement le travail des étapes précédentes, sans merge intermédiaire.
-- Le parallélisme ne vient pas de copies séparées mais du **partage des fichiers** : deux agents ne sont lancés en même temps que s'ils n'écrivent pas dans les mêmes dossiers (ex : `backend-go` et `frontend`).
-- Chaque **point de validation** se fait sur `git diff` depuis le point précédent. Le PO committe s'il valide ; l'étape suivante part de ce commit.
-- **Budget de revue** : le diff d'un point de validation reste lisible, environ 400 lignes écrites à la main (code généré exclu). Si l'ADR prévoit plus, l'architecte découpe la feature en **lots**, chacun livré par son propre cycle et sa propre PR.
+- **Une branche d'intégration par feature** (`feature/<nom-court>`), créée par le PO à partir de `main`. Aucun agent ne travaille sur `main` ni directement sur la branche d'intégration.
+- **Une PR par tâche de l'ADR.** Pour chaque tâche, le PO crée la branche `feature/<nom-court>-tNN-<sujet>` à partir de la branche d'intégration à jour ; l'agent y travaille, dans la copie courante (pas de worktree). Le PO committe, pousse, ouvre la PR vers la branche d'intégration et la fusionne s'il la valide ; la tâche suivante part de la branche d'intégration après cette fusion. Les tâches s'enchaînent donc une à une ; deux tâches ne tournent en même temps que si le PO ouvre lui-même une seconde copie, et seulement si elles n'écrivent pas dans les mêmes fichiers.
+- Une PR de tests écrits avant le code (TDD) laisse la branche d'intégration rouge jusqu'à la PR d'implémentation correspondante ; c'est attendu et écrit dans la PR. `main` ne reçoit que la branche d'intégration, par une **PR de fin de lot** (commit de fusion, sans squash), quand toutes les PR de tâches sont fusionnées et la CI verte : `main` reste toujours vert.
+- Chaque **point de validation** est la PR d'une tâche, relue sur son diff avec la branche d'intégration.
+- **Budget de revue** : chaque PR de tâche reste lisible, environ 400 lignes écrites à la main (code généré exclu). Si l'ADR prévoit plus, l'architecte découpe la feature en **lots**, chacun livré par son propre cycle, sa branche d'intégration et ses PR de tâches.
 - `.claude/settings.json` demande une confirmation avant tout `git commit`, `git push` ou `gh pr create`, et interdit les commandes destructrices (`git reset --hard`, `git clean`, push forcé).
 
 ### Cycle d'une feature
@@ -83,7 +83,7 @@ doc/securite/ rapports et modèle de menace    (agent securite)
 8. `securite` audite et fuzze la branche → **le PO décide** des corrections, confiées à l'agent concerné.
 9. `devops` met à jour l'image, le déploiement et la CI.
 10. `architecte` vérifie la conformité du code à l'ADR et met à jour la documentation (diagrammes, README) → **validation du PO**.
-11. Le PO relit la PR complète et merge dans `main`.
+11. Le PO ouvre la PR de fin de lot (branche d'intégration vers `main`), la relit et la fusionne.
 
 Règles communes à tous les agents :
 

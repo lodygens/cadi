@@ -1,0 +1,103 @@
+openapi: 3.0.3
+info:
+  title: API CADI
+  version: 0.3.0
+  description: |
+    Contrat de l'API REST publique de CADI, servie sous `https://<domaine>/api/`.
+    Ce fichier fait foi pour le backend (code serveur généré par oapi-codegen)
+    et pour le frontend (types générés par openapi-typescript).
+
+    Conventions (ADR 20261030-socle) :
+    - chemins, noms de champs JSON et codes d'erreur en français ;
+    - noms de schémas et `operationId` en anglais : ils deviennent des identifiants de code ;
+    - chaque feature ajoute ses chemins et ses schémas ;
+    - refus par défaut : une opération sans exigence de sécurité doit figurer dans la liste fermée
+      `api.PublicOperations` (lot 0a : `getHealth`), vérifiée par un test de conformité ;
+      aucune opération non publique n'est ajoutée avant le lot de la connexion ;
+    - toute erreur hors des réponses déclarées suit le schéma `Error` (réponse `default`),
+      `Content-Type: application/json`, `Cache-Control: no-store`, sans aucun détail interne ;
+      y compris un chemin inconnu (`404 introuvable`, sous `/api/` ou non) et une méthode inconnue
+      sur un chemin connu (`405 methode_non_autorisee`, avec l'en-tête `Allow`).
+servers:
+  - url: /api
+paths:
+  /sante:
+    get:
+      operationId: getHealth
+      summary: État de santé du service
+      description: |
+        Indique si le service fonctionne : l'API a joint le service base de données il y a moins
+        de 5 secondes, et le dernier contrôle de la base par ce service (toutes les 60 secondes) a réussi.
+        La réponse est servie depuis ce résultat : une requête n'atteint jamais la base.
+        Accessible sans connexion : la réponse ne contient aucune donnée, ni commune ni personnelle,
+        ni aucun détail sur la cause d'une indisponibilité.
+      security: []
+      responses:
+        '200':
+          description: L'API, le service base de données et la base répondent.
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        '503':
+          description: Le service base de données ou la base ne répond pas (arrêté, injoignable ou trop lent).
+          headers:
+            Cache-Control:
+              $ref: '#/components/headers/NoStore'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  headers:
+    NoStore:
+      description: Toujours `no-store`.
+      schema:
+        type: string
+  responses:
+    Error:
+      description: Erreur générique, sans détail interne.
+      headers:
+        Cache-Control:
+          $ref: '#/components/headers/NoStore'
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    Health:
+      type: object
+      additionalProperties: false
+      required:
+        - statut
+      properties:
+        statut:
+          type: string
+          enum:
+            - ok
+            - indisponible
+          description: "`ok` avec le code 200, `indisponible` avec le code 503."
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          enum:
+            - requete_invalide
+            - introuvable
+            - methode_non_autorisee
+            - trop_volumineux
+            - erreur_interne
+          description: |
+            `requete_invalide` (400), `introuvable` (404, chemin inconnu),
+            `methode_non_autorisee` (405, méthode inconnue sur un chemin connu),
+            `trop_volumineux` (413), `erreur_interne` (500).
+            Chaque feature ajoute les codes dont elle a besoin.
