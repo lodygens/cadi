@@ -39,7 +39,7 @@ Tu travailles sur la branche `feature/<nom>`, jamais sur `main`, et seulement ap
 
 ## CI (GitHub Actions)
 
-- À chaque PR : lint, tests Go (`-race`), tests d'intégration (build tag `integration`, PostgreSQL en service), tests frontend, build des images, `govulncheck`, `gosec`, audit npm, scan d'image (ex : Trivy), et un fuzzing court (`-fuzztime=30s`) des cibles écrites par `securite`.
+- À chaque PR : lint, tests Go (`-race`), tests d'intégration (build tag `integration`, PostgreSQL en service), tests frontend, build des images, `govulncheck`, `deadcode` (échoue sur toute sortie), `gosec`, audit npm, scan d'image (ex : Trivy), et un fuzzing court (`-fuzztime=30s`) des cibles écrites par `securite`.
 - Actions tierces épinglées par SHA de commit ; permissions du `GITHUB_TOKEN` minimales.
 - La CI ne déploie jamais automatiquement en production.
 

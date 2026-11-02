@@ -1,0 +1,119 @@
+# Configuration golangci-lint v2 (ADR 20261030-socle, D3 : frontières entre packages).
+version: "2"
+
+linters:
+  default: standard
+  enable:
+    - depguard
+    - gosec
+  settings:
+    depguard:
+      rules:
+        # pgx n'est importé que par internal/store.
+        pgx-only-in-store:
+          files:
+            - "$all"
+            - "!$test"
+            - "!**/internal/store/**"
+          deny:
+            - pkg: github.com/jackc/pgx
+              desc: pgx n'est importé que par internal/store (D3)
+        # api : api/oapi, logic, platform.
+        api:
+          files:
+            - "**/internal/api/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/lodygens/cadi/backend/internal/store
+              desc: api ne doit pas importer store* (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/storeclient
+              desc: api ne doit pas importer store* (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/storeapi
+              desc: api ne doit pas importer store* (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/config
+              desc: api ne peut importer que api/oapi, logic et platform (D3)
+        # logic : platform et bibliothèque standard hors net/http.
+        logic:
+          files:
+            - "**/internal/logic/*.go"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/lodygens/cadi/backend/internal/platform
+          deny:
+            - pkg: net/http
+              desc: logic n'importe pas net/http (D3)
+        # storeclient : logic, storeapi, config, platform, net/http (liste d'autorisation, cf. préfixes).
+        storeclient:
+          files:
+            - "**/internal/storeclient/*.go"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/lodygens/cadi/backend/internal/logic
+            - github.com/lodygens/cadi/backend/internal/storeapi
+            - github.com/lodygens/cadi/backend/internal/config
+            - github.com/lodygens/cadi/backend/internal/platform
+        # store : storeapi, config, platform, pgx.
+        store:
+          files:
+            - "**/internal/store/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/lodygens/cadi/backend/internal/api
+              desc: store ne doit pas importer api (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/logic
+              desc: store ne doit pas importer logic (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/storeclient
+              desc: store ne doit pas importer storeclient (D3)
+        # Code généré : aucun package internal/.
+        generated:
+          files:
+            - "**/internal/storeapi/**"
+            - "**/internal/api/oapi/**"
+            - "!$test"
+          deny:
+            - pkg: github.com/lodygens/cadi/backend/internal
+              desc: le code généré n'importe aucun package internal/ (D3)
+        # config, platform : bibliothèque standard seulement.
+        stdlib-only:
+          files:
+            - "**/internal/config/*.go"
+            - "**/internal/platform/*.go"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+        # cmd/cadi-store : store, storeapi, config, platform.
+        cmd-store:
+          files:
+            - "**/cmd/cadi-store/*.go"
+            - "!$test"
+          deny:
+            - pkg: github.com/lodygens/cadi/backend/internal/api
+              desc: cadi-store ne doit pas importer api (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/logic
+              desc: cadi-store ne doit pas importer logic (D3)
+            - pkg: github.com/lodygens/cadi/backend/internal/storeclient
+              desc: cadi-store ne doit pas importer storeclient (D3)
+        # Autres cmd/* : tout sauf store. Liste d'autorisation : depguard compare par préfixe,
+        # donc interdire internal/store interdirait aussi storeclient et storeapi.
+        cmd-others:
+          files:
+            - "**/cmd/cadi-api/*.go"
+            - "**/cmd/cadi-collector/*.go"
+            - "**/cmd/cadi-notifier/*.go"
+            - "!$test"
+          list-mode: strict
+          allow:
+            - $gostd
+            - github.com/lodygens/cadi/backend/internal/api
+            - github.com/lodygens/cadi/backend/internal/logic
+            - github.com/lodygens/cadi/backend/internal/storeclient
+            - github.com/lodygens/cadi/backend/internal/storeapi
+            - github.com/lodygens/cadi/backend/internal/config
+            - github.com/lodygens/cadi/backend/internal/platform
+            - github.com/lodygens/cadi/backend/internal/collector
+            - github.com/lodygens/cadi/backend/internal/notifier

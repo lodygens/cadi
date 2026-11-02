@@ -62,9 +62,11 @@ gofmt -l .        # aucune sortie
 go vet ./...
 golangci-lint run # s'il est installé
 go test -race ./...
+govulncheck ./... # aucune vulnérabilité atteinte par le code
+deadcode ./...    # aucune fonction inatteignable
 ```
 
-Tout doit passer. Si un outil manque, dis-le dans le rapport au lieu de l'installer. N'annonce jamais un résultat que tu n'as pas obtenu.
+Tout doit passer, à chaque tâche. Exception : pendant une tâche de squelette ou de tests, `deadcode` signale normalement les fonctions pas encore appelées ; résume alors sa sortie dans le rapport (nombre et packages). Dès qu'une tâche d'implémentation branche une fonction, celle-ci ne doit plus apparaître ; toute fonction encore signalée à la fin de l'implémentation est soit supprimée, soit justifiée dans le rapport. `govulncheck` ne tolère aucune exception : une vulnérabilité atteinte par le code, y compris dans la bibliothèque standard de la version de Go utilisée, arrête la tâche et se signale. Si un outil manque, dis-le dans le rapport au lieu de l'installer. N'annonce jamais un résultat que tu n'as pas obtenu.
 
 ## Rapport final
 
