@@ -98,9 +98,9 @@ contrat OpenAPI (`doc/api/openapi.yaml`, un ajout ou une modification par featur
 ## Découpage en tâches
 Dans l'ordre du cycle de CLAUDE.md : squelette (backend-go / frontend),
 tests (qa), implémentation (backend-go / frontend), audit (securite), infra (devops), conformité et documentation (architecte).
-Chaque tâche : identifiant (`T1`, `T2`…), agent, fichiers, critères d'acceptation couverts, dépendances, critère de fin.
+Chaque tâche est livrée par sa propre PR vers la branche d'intégration de la feature (voir *Organisation git* dans `CLAUDE.md`) : identifiant (`T1`, `T2`…), agent, branche (`feature/<nom-court>-tNN-<sujet>`), titre de PR, fichiers, critères d'acceptation couverts, dépendances, critère de fin.
 Deux tâches parallèles ne doivent jamais écrire dans les mêmes fichiers.
-Estimer la taille de chaque point de validation ; au-delà d'environ 400 lignes écrites à la main, découper la feature en lots (un ADR et une PR par lot).
+Estimer la taille de chaque tâche ; une tâche reste sous environ 400 lignes écrites à la main, sinon la découper en plusieurs tâches. Si la feature est trop grosse pour un seul ADR, la découper en lots (un ADR et une branche d'intégration par lot).
 
 ## Points reportés
 Ce qui n'est pas décidé, et ce qui justifierait de revoir la décision.
