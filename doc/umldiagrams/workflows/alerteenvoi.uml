@@ -25,6 +25,10 @@ while (Rappel à traiter suivant ?) is (oui)
             end note
         endif
         if (Le rappel correspond à l'alerte ?) then (oui)
+            note right
+              enseigne: liée au rappel, ou
+              rappel « toutes enseignes »
+            end note
             if (Correspondance incertaine et\npolitique de risque stricte ?) then (non)
                 if (Rappel déjà signalé\npour cette alerte ?) then (non)
                     :Ajout de la correspondance
