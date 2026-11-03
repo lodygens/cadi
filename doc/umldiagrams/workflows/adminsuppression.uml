@@ -13,6 +13,10 @@ if (Authentifié en tant qu'administrateur ?) then (oui)
         de la donnée et de ses liens;
         :Effacement des données qui en
         dépendent obligatoirement;
+        note right
+          ex: produits d'une famille,
+          marques absorbées par une marque
+        end note
         :Trace de la suppression
         (auteur « administrateur »,
         jamais son email ni son id);

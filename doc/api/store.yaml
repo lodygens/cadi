@@ -1,0 +1,126 @@
+openapi: 3.0.3
+info:
+  title: Interface interne du service base de données de CADI
+  version: 0.4.0
+  description: |
+    Contrat de l'interface interne du service base de données (`store`), appelée par
+    l'API, le service lecture et le service notification, chacun sur son propre réseau interne,
+    jamais depuis l'extérieur. Client et serveur Go générés par oapi-codegen (package `storeapi`).
+
+    Conventions (ADR 20261030-socle, D7) :
+    - chemins, noms de champs JSON et codes d'erreur en français ; schémas et `operationId` en anglais ;
+    - uniquement des opérations métier, jamais de requête SQL libre ; une opération = une transaction ;
+    - toutes les routes, `/sante` comprise, exigent le jeton du service appelant (`bearerAuth`) ;
+      l'authentification et l'autorisation sont décidées avant le routage, sans lire le corps :
+      `401` sans jeton valide (quel que soit le chemin) ; puis, pour un appelant authentifié,
+      `404 introuvable` pour un chemin inconnu, `405 methode_non_autorisee` (avec l'en-tête `Allow`)
+      pour une méthode inconnue sur un chemin connu ; `403` si l'opération n'est pas ouverte à ce
+      service (refus par défaut) ; ces refus de routage suivent le schéma `Error` (réponse `default`),
+      `Content-Type: application/json`, `Cache-Control: no-store`, sans détail interne ;
+    - chaque opération déclare obligatoirement :
+      - `x-cadi-appelants` : services autorisés, parmi `api`, `collector`, `notifier` ;
+      - `x-cadi-donnees-personnelles` : `true` si l'opération lit ou écrit une donnée personnelle
+        (jamais ouverte au service lecture `collector`) ;
+      ces extensions font foi ; la table `store.Operations()` du code leur est comparée par le test
+      de conformité (CA12), qui fait échouer la CI sur tout écart ;
+    - `503` : la base est injoignable, rien n'a été exécuté ; erreur inattendue : `500 erreur_interne`, sans détail ;
+    - les issues métier (absent, conflit) sont déclarées par opération (`404`, `409`), avec leur propre
+      code, distinct d'`introuvable` (chemin inconnu) ;
+    - les opérations d'écriture sont idempotentes, pour pouvoir être rejouées après un résultat inconnu ;
+    - une opération ouverte à l'API porte un `id_user` explicite et ne touche que les données de cet utilisateur.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+paths:
+  /sante:
+    get:
+      operationId: getStoreHealth
+      summary: État de santé du service base de données
+      description: |
+        Renvoie le résultat du dernier contrôle de la base, effectué toutes les 60 secondes par le
+        service lui-même. Cette route n'interroge jamais la base.
+      x-cadi-appelants:
+        - api
+        - collector
+        - notifier
+      x-cadi-donnees-personnelles: false
+      responses:
+        '200':
+          description: Le dernier contrôle de la base a réussi, il y a moins de 150 secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreHealth'
+        '503':
+          description: Le dernier contrôle de la base a échoué, ou date de plus de 150 secondes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StoreHealth'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        default:
+          $ref: '#/components/responses/Error'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: |
+        Jeton propre au service appelant : 32 octets aléatoires en 64 caractères hexadécimaux,
+        lu depuis un fichier de secret ; jamais tracé.
+  responses:
+    Unauthenticated:
+      description: Jeton absent, mal formé ou inconnu.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: Opération non ouverte au service appelant.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Error:
+      description: Erreur générique, sans détail interne.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+  schemas:
+    StoreHealth:
+      type: object
+      additionalProperties: false
+      required:
+        - statut
+      properties:
+        statut:
+          type: string
+          enum:
+            - ok
+            - indisponible
+          description: "`ok` avec le code 200, `indisponible` avec le code 503."
+    Error:
+      type: object
+      additionalProperties: false
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          enum:
+            - requete_invalide
+            - non_authentifie
+            - interdit
+            - introuvable
+            - methode_non_autorisee
+            - trop_volumineux
+            - erreur_interne
+          description: |
+            `requete_invalide` (400), `non_authentifie` (401), `interdit` (403),
+            `introuvable` (404, chemin inconnu), `methode_non_autorisee` (405, méthode inconnue
+            sur un chemin connu), `trop_volumineux` (413), `erreur_interne` (500).
