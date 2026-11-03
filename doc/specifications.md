@@ -275,7 +275,7 @@ Les marques sont gérées par le backend, en fonction des rappels de produit dé
 4. **Lecture**: les marques sont librement accessibles aux utilisateurs enregistrés;
 5. **Modification** : la seule modification possible est la fusion d'une marque avec une marque déjà connue, décidée par l'IA de la fusion de marques ou par le Product Owner dans le fichier des décisions de fusion. Une fusion décidée par le Product Owner renseigne le lien `id_marque_cible` de la marque absorbée et ne modifie aucun rappel. Le nom d'une marque n'est jamais modifié;
 6. **Transfert de propriété**: il est impossible de transférer la propriété d'une marque;
-6. **Suppression**: seul l'administrateur peut supprimer une marque; l'effacement est immédiat et définitif (voir [Suppression de données](#suppression-de-données)).
+6. **Suppression**: seul l'administrateur peut supprimer une marque; l'effacement est immédiat et définitif, et s'étend aux marques qu'elle a absorbées (voir [Suppression de données](#suppression-de-données)).
 
 ### Gouvernance des produits
 
@@ -408,7 +408,13 @@ Décisions de fusion de l'IA:
 
 Les données envoyées à l'IA sont des données publiques, issues des rappels (noms de marque): elles ne contiennent **aucune donnée personnelle**.
 
-*NB: restent à trancher par le Product Owner: le choix du modèle d'IA et de son hébergement (souveraineté); le comportement à la suppression d'une marque fusionnée; l'envoi ou non des alertes passées après une fusion décidée après coup.*
+**Choix de l'IA.** L'IA utilisée est déterminée par la configuration: son jeton d'accès est fourni par une variable d'environnement (ex: `OPENAI_API_TOKEN`). Ce jeton est un secret: il n'est jamais dans le dépôt, dans la base de données ni dans les traces.
+
+Sans jeton *IA*, l'étape IA n'est pas executée.
+
+**Fusion décidée après coup.** Une fusion décidée par le Product Owner après la collecte d'un rappel n'envoie aucune alerte pour les rappels déjà collectés: ils ne sont pas comparés de nouveau aux alertes. La fusion ne vaut, pour l'envoi des alertes, que pour les rappels collectés ensuite (voir [Envoi des alertes](#envoi-des-alertes)); elle vaut immédiatement pour les filtres et les statistiques.
+
+**Suppression d'une marque fusionnée.** Supprimer une marque supprime aussi les marques qu'elle a absorbées (liées à elle par `id_marque_cible`). Pour chacune, la règle générale s'applique: les rappels perdent leur marque, le critère *marque* des alertes est retiré, et une alerte qui n'a plus aucun critère est effacée (voir [Suppression de données](#suppression-de-données)).
 
 ## Produits
 
@@ -543,6 +549,7 @@ La classe rappels contient les informations relatives aux rappels produit. Un ra
 - string zone_geographique  : facultatif ; zone de vente, texte libre
 - boolean zone_incertaine   : requis ; vrai si la zone de vente est absente ou n'a pas pu être interprétée ; fixé à la création
 - string distributeurs      : facultatif ; liste des distributeurs telle que publiée, texte libre
+- boolean toutes_enseignes  : requis ; vrai si les distributeurs contiennent une formule « toutes enseignes » : le rappel concerne alors toutes les enseignes (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)) ; fixé à la création
 - string url_fiche          : facultatif ; lien vers la fiche officielle
 ```
 
@@ -554,7 +561,7 @@ En règle générale, les champs des rappels sont des **textes libres**, écrits
 2. des liens structurés (départements, enseignes, magasins) n'en sont tirés que par des **règles exactes**: normalisation, référentiels officiels et fichiers déclarés (écritures d'enseigne, appellations de zone), versionnés avec le code;
 3. **aucun rapprochement approché automatique**: un élément qui ne correspond exactement à rien n'est rattaché à rien. Seuls les noms de marque font exception: ils suivent la [fusion de marques](#fusion-de-marques) (noms proches, IA, décision du Product Owner);
 4. tout élément non reconnu est **signalé** (traces de la collecte), pour que le Product Owner complète les fichiers déclarés;
-5. en cas de doute sur la zone de vente, on retient **l'interprétation qui prévient le plus**: « France entière ». Mieux vaut un email de trop qu'un rappel manqué. Le rappel est alors marqué comme incertain (`zone_incertaine`), et chaque utilisateur choisit s'il veut recevoir ces rappels (voir [Correspondances incertaines](#correspondances-incertaines)). Les distributeurs ne suivent pas cette règle: un rappel dont aucune enseigne n'est reconnue n'a pas d'enseigne (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)).
+5. en cas de doute sur la zone de vente, on retient **l'interprétation qui prévient le plus**: « France entière ». Mieux vaut un email de trop qu'un rappel manqué. Le rappel est alors marqué comme incertain (`zone_incertaine`), et chaque utilisateur choisit s'il veut recevoir ces rappels (voir [Correspondances incertaines](#correspondances-incertaines)). Les distributeurs ne suivent pas cette règle: un rappel dont aucune enseigne n'est reconnue n'a pas d'enseigne, sauf s'il cite une formule « toutes enseignes » (voir [Interprétation des distributeurs](#interprétation-des-distributeurs)).
 
 **Normalisation.** Tous les textes comparés le sont après la même normalisation: forme Unicode NFKC; suppression des symboles ®, ™, © et ℗; minuscules; accents retirés; « & » remplacé par « et »; ponctuation, apostrophes et tirets remplacés par des espaces; espaces multiples réduits à un seul; espaces de début et de fin retirés (ex: « Île-de-France » → « ile de france », « Carrefour Hypermarché » → « carrefour hypermarche »). Pour les noms de marque, la clé de comparaison ignore en outre les espaces (voir [Fusion de marques](#fusion-de-marques)).
 
@@ -566,11 +573,13 @@ Le champ `distributeurs` est une liste en texte libre qui mélange enseignes, ma
 
 1. le texte est découpé en éléments: virgules, points-virgules, « ¤ », « / », retours à la ligne;
 2. chaque élément est normalisé, et les mots ignorés déclarés (ex: « uniquement », « seulement », « magasin », « magasins ») en sont retirés;
-3. on cherche la **plus longue [écriture d'enseigne](#écritures-denseigne)** par laquelle l'élément **commence** (mots entiers):
+3. si l'élément est une **formule « toutes enseignes »** (comparée avant le retrait des mots ignorés: sinon « tous magasins » deviendrait « tous »), le rappel concerne **toutes les enseignes** (`toutes_enseignes` est vrai). Ces formules forment une liste déclarée, versionnée avec le code et comparée après normalisation, comme les écritures d'enseigne (ex: « toutes enseignes », « toutes les enseignes », « tous distributeurs », « tous magasins »). Une formule qui n'y figure pas (ex: « gms ») reste une formule générale: elle n'est rattachée à rien;
+4. sinon, on cherche la **plus longue [écriture d'enseigne](#écritures-denseigne)** par laquelle l'élément **commence** (mots entiers):
    - aucune: l'élément n'est rattaché à rien et il est signalé (producteur, commerce indépendant, formule générale);
    - une écriture, sans reste: l'enseigne est liée au rappel;
    - une écriture suivie d'un reste: l'enseigne est liée au rappel; si le reste est le nom d'une commune identifiée sans ambiguïté dans la base officielle des codes postaux (au besoin parmi les départements du rappel), le magasin de cette enseigne dans cette commune est lié au rappel, et créé s'il n'existe pas. Sinon, seule l'enseigne est liée et le reste est signalé;
-4. si **aucune enseigne** n'est liée (champ vide, formule générale comme « toutes enseignes », « gms » ou « voir pièce jointe », ou aucune enseigne reconnue), le rappel **n'a pas d'enseigne**. Il ne correspond à aucun critère *enseigne*: il ne peut être reçu que par un autre critère (marque, produit, famille, code postal). C'est le cas d'environ la moitié des fiches (47 % des fiches nationales publiées de juillet 2024 à octobre 2026, avec une liste d'environ 70 enseignes), voir [Gestion des risques](#gestion-des-risques).
+5. si le rappel cite une formule « toutes enseignes », il **correspond à tout critère *enseigne***, quelle que soit l'enseigne de l'alerte (voir [Envoi des alertes](#envoi-des-alertes)). Les enseignes et magasins cités par ailleurs dans le champ sont liés comme ci-dessus;
+6. si **aucune enseigne** n'est liée et que le rappel ne cite pas de formule « toutes enseignes » (champ vide, formule générale comme « gms » ou « voir pièce jointe », ou aucune enseigne reconnue), le rappel **n'a pas d'enseigne**. Il ne correspond à aucun critère *enseigne*: il ne peut être reçu que par un autre critère (marque, produit, famille, code postal). C'est le cas d'environ la moitié des fiches (51 % des 6 767 fiches nationales publiées de juillet 2024 à octobre 2026, avec une liste de 80 enseignes; la proportion dépend de la liste déclarée), voir [Gestion des risques](#gestion-des-risques). Les formules « toutes enseignes » ne concernent que 5 de ces fiches.
 
 Exemples:
 
@@ -579,6 +588,7 @@ Exemples:
 | carrefour hypermarché ermont uniquement | Carrefour | Carrefour Ermont (95) | — |
 | carrefour | Carrefour | — | — |
 | saff¤soudry sas¤ferme fontaine¤fromagerie de romain¤leclerc fecamp¤coopérative u¤saisonniers¤carrefour gruchet¤netto bolbec¤intermarché fecamp¤fromagerie pauly¤2 airelles¤nsf¤magasin des 5 frères¤ | E.Leclerc, U, Carrefour, Netto, Intermarché | E.Leclerc Fécamp, Netto Bolbec, Intermarché Fécamp | saff, soudry sas, ferme fontaine, fromagerie de romain, saisonniers, fromagerie pauly, 2 airelles, nsf, des 5 frères, et « gruchet » (deux communes possibles: Gruchet-le-Valasse, Gruchet-Saint-Siméon) |
+| toutes enseignes | toutes (`toutes_enseignes` vrai) | — | — |
 | toute enseigne distribuant la marque auchan | aucune: le rappel **n'a pas d'enseigne** | — | toute enseigne distribuant la marque auchan |
 
 Le dernier exemple montre pourquoi l'écriture d'enseigne doit être en **début** d'élément: « auchan » y désigne une marque de distributeur, pas l'enseigne qui vend le produit.
@@ -637,7 +647,7 @@ Cette table fait le lien entre un rappel et un produit.
 
 ### Rappels enseignes
 
-Cette table fait le lien entre un rappel et une enseigne.
+Cette table fait le lien entre un rappel et une enseigne. Un rappel « toutes enseignes » n'y a pas une ligne par enseigne: il est marqué par son champ `toutes_enseignes` (voir [Rappels](#rappels)).
 
 ```
 - int id_rappel   : requis ; ref rappel
@@ -683,10 +693,13 @@ La zone de vente d'un rappel est **France entière** lorsqu'aucun département n
 
 Un rappel ne concerne pas forcément ses enseignes sur la même zone. La géographie de chaque enseigne d'un rappel est déduite de ses liens:
 
-- une enseigne citée seule dans les distributeurs (sans magasin) prend la zone de vente du rappel (départements liés, ou France entière);
-- une enseigne citée uniquement par des magasins prend la zone de ces magasins (leurs départements);
+- une enseigne citée seule dans les distributeurs prend la zone de vente du rappel (départements liés, ou France entière), même si certains de ses magasins sont aussi cités: « carrefour, carrefour ermont » lie l'enseigne Carrefour, qui prend la zone de vente, et le magasin Carrefour d'Ermont;
+- dans un rappel « toutes enseignes », toutes les enseignes prennent la zone de vente du rappel, y compris celles citées par leurs magasins: « toutes enseignes, leclerc fecamp » concerne toutes les enseignes sur la zone de vente, et lie en plus le magasin E.Leclerc de Fécamp;
+- sinon, une enseigne citée uniquement par des magasins prend la zone de ces magasins (leurs départements).
 
-La **géographie du rappel** est la réunion des géographies de ses enseignes, ou sa zone de vente s'il ne cite aucune enseigne. Elle sert à l'affichage, aux statistiques et à l'[envoi des alertes](#envoi-des-alertes).
+Les magasins cités restent liés au rappel dans tous les cas: ils servent à l'affichage et aux statistiques par magasin.
+
+La **géographie du rappel** est la réunion des géographies de ses enseignes, ou sa zone de vente s'il ne cite aucune enseigne; un rappel « toutes enseignes » comprend donc toujours sa zone de vente. Elle sert à l'affichage, aux statistiques et à l'[envoi des alertes](#envoi-des-alertes).
 
 Exemple: zone de vente « France entière », distributeurs « carrefour, leclerc fecamp ». Carrefour est cité seul: il prend la France entière. E.Leclerc n'est cité que par son magasin de Fécamp: il prend la Seine-Maritime (76).
 
@@ -697,8 +710,6 @@ Exemple: zone de vente « France entière », distributeurs « carrefour, lecler
 | marque X (marque du produit rappelé) ET 67 | oui: la géographie du rappel comprend la France entière |
 
 Si la zone de vente est « 68 », Carrefour prend le 68 et E.Leclerc le 76: « marque X ET 67 » ne reçoit pas le rappel.
-
-*NB: le cas d'une même enseigne citée à la fois seule et par un magasin (ex: « carrefour, carrefour ermont ») reste à trancher: zone de vente ou zone du magasin ?*
 
 ## Référentiel géographique
 
@@ -798,7 +809,7 @@ Les statistiques ne sont pas stockées: elles sont calculées à partir des rapp
 
 Par zone géographique, un rappel compte pour chaque département de sa géographie (voir [Géographie par enseigne](#géographie-par-enseigne)); un rappel national (France entière) compte donc pour chaque département. Les totaux par département ne s'additionnent pas pour donner le total national.
 
-Par enseigne, un rappel sans enseigne ne compte pour aucune enseigne.
+Par enseigne, un rappel « toutes enseignes » compte pour chaque enseigne de la liste déclarée, comme un rappel national compte pour chaque département: les totaux par enseigne ne s'additionnent pas. Un rappel sans enseigne ne compte pour aucune enseigne.
 
 # Workflow
 
@@ -810,7 +821,7 @@ Toute suppression est **immédiate et définitive**: la donnée est effacée de 
 
 - **compte utilisateur** : effacement du compte, de ses alertes, de ses emails d'alerte et de leurs envois, de ses sessions et de ses jetons de connexion;
 - **alerte** : effacement de l'alerte, de ses liens avec les départements et de ses envois;
-- **donnée de référence** (par l'administrateur) : effacement de la donnée et de ses liens avec les rappels. Les références facultatives vers elle sont vidées (ex: un rappel perd sa marque, un critère d'alerte est retiré); les données qui en dépendent obligatoirement sont effacées avec elle (ex: les produits d'une famille). Une alerte qui n'a plus aucun critère est effacée;
+- **donnée de référence** (par l'administrateur) : effacement de la donnée et de ses liens avec les rappels. Les références facultatives vers elle sont vidées (ex: un rappel perd sa marque, un critère d'alerte est retiré); les données qui en dépendent obligatoirement sont effacées avec elle (ex: les produits d'une famille, les marques absorbées par une marque, voir [Fusion de marques](#fusion-de-marques)). Une alerte qui n'a plus aucun critère est effacée;
 - **rappel** (par l'administrateur) : effacement du rappel, de ses liens et des envois qui le citent. L'effacement sert à retirer une erreur de lecture, pas à masquer un rappel publié. Comme la collecte ne relit que les fiches récentes, le rappel n'est recréé que si RappelConso republie la fiche, ou si elle a moins de 30 jours (marge de recouvrement de la collecte, voir [Sources des rappels](#sources-des-rappels)): il revient alors comme un nouveau rappel, et les emails d'alerte repartent. C'est voulu: l'administrateur en porte la responsabilité.
 
 Toute suppression faite par l'administrateur est écrite dans les traces: date, type et identifiant de la donnée effacée. L'auteur y est noté « administrateur », jamais son adresse email ni son identifiant d'utilisateur.
@@ -882,7 +893,7 @@ Une alerte ne reçoit que les rappels collectés après sa configuration: un rap
 
 Un critère d'une alerte correspond à un rappel lorsque:
 
-- **enseigne** : l'enseigne est liée au rappel; un rappel sans enseigne ne correspond à aucun critère *enseigne* (voir [Interprétation des distributeurs](#interprétation-des-distributeurs));
+- **enseigne** : l'enseigne est liée au rappel, ou le rappel concerne toutes les enseignes (`toutes_enseignes`); un rappel sans enseigne ne correspond à aucun critère *enseigne* (voir [Interprétation des distributeurs](#interprétation-des-distributeurs));
 - **marque** : la marque retenue du rappel est la marque retenue de l'alerte (voir [Fusion de marques](#fusion-de-marques));
 - **produit** : le produit (code-barres) est lié au rappel;
 - **famille de produit** : la famille est celle du rappel (jamais celle de ses produits, qui gardent la famille de la première fiche qui les a cités);
@@ -1137,7 +1148,7 @@ Visibles uniquement par l'administrateur:
 | L'utilisateur veut suivre une marque ou un produit qui n'a encore jamais été rappelé | Impossible de créer l'alerte: les marques et produits ne sont créés qu'à partir des rappels | Limite assumée: une alerte ne peut porter que sur des marques et des produits déjà apparus dans un rappel. Le formulaire de création ne propose que ces données. |
 | Un utilisateur en politique de risque stricte ne reçoit pas un rappel incertain qui le concernait | Il n'est pas prévenu d'un rappel qui le concerne | Politique prudente par défaut; le choix de la politique stricte est explicite et explique ce que l'utilisateur risque de manquer. |
 | Les fiches RAPEX ne sont pas collectées | Environ 1 000 fiches par an ne sont pas couvertes (voitures surtout, mais aussi des jouets et de la puériculture): leurs rappels ne sont pas signalés | Limite assumée pour la première version: seules les fiches nationales de RappelConso créent des rappels (voir [Sources des rappels](#sources-des-rappels)). |
-| La fiche ne cite pas l'enseigne qui vend le produit (« gms », « voir pièce jointe », liste incomplète) | Une alerte qui ne porte que sur une enseigne ne reçoit pas le rappel, alors que le produit y est vendu | Limite assumée: un rappel sans enseigne n'a pas d'enseigne. Le formulaire d'alerte et l'aperçu invitent à ajouter un autre critère (marque, produit, famille, code postal) avec la combinaison OU. Les éléments non reconnus sont signalés pour compléter le fichier déclaré des enseignes. |
+| La fiche ne cite pas l'enseigne qui vend le produit (« gms », « voir pièce jointe », liste incomplète) | Une alerte qui ne porte que sur une enseigne ne reçoit pas le rappel, alors que le produit y est vendu | Limite assumée: un rappel sans enseigne n'a pas d'enseigne. Les formules « toutes enseignes » ne sont pas concernées: un tel rappel correspond à toute alerte sur une enseigne. Le formulaire d'alerte et l'aperçu invitent à ajouter un autre critère (marque, produit, famille, code postal) avec la combinaison OU. Les éléments non reconnus sont signalés pour compléter le fichier déclaré des enseignes. |
 | La collecte échoue ou RappelConso change de format | Aucun rappel n'est collecté ni signalé, sans que personne ne le voie | Reprise sur erreur (table [collectes](#collectes), [rappels à traiter](#rappels-à-traiter)); traces de chaque collecte et alerte de l'exploitant sur ces traces (voir [Collecte des rappels](#collecte-des-rappels)). |
 | La collecte n'a lieu qu'une fois par jour | Un rappel peut n'être signalé à l'utilisateur que jusqu'à 24 heures après sa publication par la source | Choix assumé pour la première version: CADI complète les canaux officiels (RappelConso, affichage en magasin) sans les remplacer. La fréquence de collecte est un paramètre de configuration: elle pourra être augmentée (ex: RappelConso toutes les heures) sans changer l'architecture. |
 | L'email de connexion arrive en retard ou dans les indésirables | L'utilisateur ne peut pas se connecter | Prestataire d'envoi fiable; la page de connexion explique de vérifier les indésirables et permet de demander un nouvel email. |
